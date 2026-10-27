@@ -34,24 +34,19 @@ CREATE INDEX IF NOT EXISTS idx_attendance_created_at ON public.attendance_logs(c
 CREATE INDEX IF NOT EXISTS idx_attendance_employee_id ON public.attendance_logs(employee_id);
 CREATE INDEX IF NOT EXISTS idx_employees_name ON public.employees(name);
 
--- 4. Enable Row Level Security (RLS)
-ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.attendance_logs ENABLE ROW LEVEL SECURITY;
+-- 4. Row Level Security (RLS) Configuration
+-- For an internal kiosk attendance system, disabling RLS ensures both the Android Kiosk 
+-- and Web Client can freely insert punches, read logs, and perform resets without permission bottlenecks:
+ALTER TABLE public.employees DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance_logs DISABLE ROW LEVEL SECURITY;
 
--- 5. Open Read/Write Policies for Public Anon API Access (Internal Kiosk & Dashboard)
-CREATE POLICY "Allow public read access to employees"
-    ON public.employees FOR SELECT
-    USING (true);
-
-CREATE POLICY "Allow public insert/update to employees"
-    ON public.employees FOR ALL
-    USING (true)
-    WITH CHECK (true);
-
-CREATE POLICY "Allow public all access to attendance_logs"
-    ON public.attendance_logs FOR ALL
-    USING (true)
-    WITH CHECK (true);
+-- (Optional) If you require RLS enabled, ensure full ALL (SELECT, INSERT, UPDATE, DELETE) access is permitted:
+-- ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.attendance_logs ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS "Allow public all access to employees" ON public.employees;
+-- CREATE POLICY "Allow public all access to employees" ON public.employees FOR ALL USING (true) WITH CHECK (true);
+-- DROP POLICY IF EXISTS "Allow public all access to attendance_logs" ON public.attendance_logs;
+-- CREATE POLICY "Allow public all access to attendance_logs" ON public.attendance_logs FOR ALL USING (true) WITH CHECK (true);
 
 -- 6. Enable Realtime Replication for Live Dashboard Updates
 ALTER PUBLICATION supabase_realtime ADD TABLE public.attendance_logs;

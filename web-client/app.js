@@ -1162,12 +1162,17 @@ async function handleDeletePunch(id) {
   if (!supabaseClient) return;
 
   try {
-    const { error } = await supabaseClient
+    const { data, error } = await supabaseClient
       .from('attendance_logs')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
 
     if (error) throw error;
+    if (!data || data.length === 0) {
+      showRlsFixModal();
+      return;
+    }
     attendanceLogs = attendanceLogs.filter(l => l.id !== id);
     renderAttendanceLogs(attendanceLogs);
     updateMetrics();
@@ -1263,8 +1268,12 @@ async function handleDeleteEmployee(id) {
   if (!supabaseClient) return;
 
   try {
-    const { error } = await supabaseClient.from('employees').delete().eq('id', id);
+    const { data, error } = await supabaseClient.from('employees').delete().eq('id', id).select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      showRlsFixModal();
+      return;
+    }
     await fetchEmployees();
   } catch (err) {
     alert('Error deleting: ' + err.message);
@@ -1298,47 +1307,60 @@ async function executeTotalReset() {
 
   try {
     if (supabaseClient) {
-      // 1. Fetch all attendance logs and delete by specific IDs (bypasses any bulk UUID filter edge case)
-      const { data: logsData, error: fetchLogsErr } = await supabaseClient
+      // 1. Fetch all attendance logs and delete
+      const { data: logsData } = await supabaseClient
         .from('attendance_logs')
         .select('id');
       
-      if (!fetchLogsErr && logsData && logsData.length > 0) {
+      if (logsData && logsData.length > 0) {
         const logIds = logsData.map(l => l.id);
-        const { error: attErr } = await supabaseClient
+        await supabaseClient
           .from('attendance_logs')
           .delete()
-          .in('id', logIds);
-        if (attErr) console.warn('Attendance logs delete notice:', attErr.message);
+          .in('id', logIds)
+          .select();
       }
 
       // Also try direct neq delete
       await supabaseClient
         .from('attendance_logs')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+        .select();
 
-      // 2. Fetch all employees and delete by specific IDs
-      const { data: empsData, error: fetchEmpsErr } = await supabaseClient
+      // 2. Fetch all employees and delete
+      const { data: empsData } = await supabaseClient
         .from('employees')
         .select('id');
       
-      if (!fetchEmpsErr && empsData && empsData.length > 0) {
+      if (empsData && empsData.length > 0) {
         const empIds = empsData.map(e => e.id);
-        const { error: empErr } = await supabaseClient
+        await supabaseClient
           .from('employees')
           .delete()
-          .in('id', empIds);
-        if (empErr) console.warn('Employees delete notice:', empErr.message);
+          .in('id', empIds)
+          .select();
       }
 
       await supabaseClient
         .from('employees')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+        .select();
+
+      // 3. Verification check: Verify if the online server actually deleted them
+      const { data: checkLogs } = await supabaseClient.from('attendance_logs').select('id').limit(5);
+      const { data: checkEmps } = await supabaseClient.from('employees').select('id').limit(5);
+
+      if ((checkLogs && checkLogs.length > 0) || (checkEmps && checkEmps.length > 0)) {
+        console.warn('Supabase RLS prevented deletion. Records still present on server.');
+        closeResetModal();
+        showRlsFixModal();
+        return;
+      }
     }
 
-    // Reset local state
+    // Reset local state only when confirmed deleted on server
     attendanceLogs = [];
     employeesList = [];
 
@@ -1357,6 +1379,32 @@ async function executeTotalReset() {
     btn.innerHTML = originalHtml;
     lucide.createIcons();
   }
+}
+
+function showRlsFixModal() {
+  const modal = document.getElementById('rls-fix-modal');
+  if (modal) modal.classList.remove('hidden');
+  lucide.createIcons();
+}
+
+function closeRlsFixModal() {
+  const modal = document.getElementById('rls-fix-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function copyRlsSql() {
+  const sql = document.getElementById('rls-sql-code').innerText;
+  navigator.clipboard.writeText(sql).then(() => {
+    const textEl = document.getElementById('copy-rls-btn-text');
+    if (textEl) {
+      textEl.innerText = 'Copied!';
+      setTimeout(() => {
+        textEl.innerText = 'Copy SQL';
+      }, 2500);
+    }
+  }).catch(() => {
+    alert('SQL copied: ' + sql);
+  });
 }
 
 function renderSampleDemoData() {
