@@ -39,7 +39,7 @@ class OfflinePunchItem {
     'employee_id': employeeId,
     'confidence': confidence,
     'device_id': deviceId,
-    'created_at': createdAt.toIso8601String(),
+    'created_at': createdAt.toUtc().toIso8601String(),
   };
 
   factory OfflinePunchItem.fromMap(Map<String, dynamic> map) => OfflinePunchItem(
@@ -188,7 +188,8 @@ class SupabaseSyncService {
     if (!_isInitialized) return;
     try {
       final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
+      // True start of the local day represented in UTC ISO format
+      final startOfDay = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
       final res = await Supabase.instance.client
           .from('attendance_logs')
           .select('employee_name')
@@ -273,7 +274,7 @@ class SupabaseSyncService {
             'name': user.name,
             'photo_url': photoDataUrl,
             'embeddings': user.embeddings,
-            'created_at': user.registeredAt.toIso8601String(),
+            'created_at': user.registeredAt.toUtc().toIso8601String(),
           })
           .select('id')
           .maybeSingle();
@@ -343,7 +344,7 @@ class SupabaseSyncService {
           'punch_type': 'IN', // Purely Punch IN
           'confidence': punchItem.confidence,
           'device_id': punchItem.deviceId,
-          'created_at': punchItem.createdAt.toIso8601String(),
+          'created_at': punchItem.createdAt.toUtc().toIso8601String(),
         };
         if (punchItem.employeeId != null) {
           insertData['employee_id'] = punchItem.employeeId;
@@ -406,7 +407,7 @@ class SupabaseSyncService {
           'punch_type': 'IN',
           'confidence': punch.confidence,
           'device_id': punch.deviceId,
-          'created_at': punch.createdAt.toIso8601String(),
+          'created_at': punch.createdAt.toUtc().toIso8601String(),
         };
         if (punch.employeeId != null) {
           insertData['employee_id'] = punch.employeeId;
