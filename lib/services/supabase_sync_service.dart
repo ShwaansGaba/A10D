@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
@@ -256,10 +257,21 @@ class SupabaseSyncService {
     if (!_isInitialized) return null;
 
     try {
+      String? photoDataUrl;
+      if (user.photoPath.isNotEmpty && File(user.photoPath).existsSync()) {
+        try {
+          final bytes = await File(user.photoPath).readAsBytes();
+          photoDataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        } catch (e) {
+          debugPrint('Photo encode notice: $e');
+        }
+      }
+
       final res = await Supabase.instance.client
           .from('employees')
           .upsert({
             'name': user.name,
+            'photo_url': photoDataUrl,
             'embeddings': user.embeddings,
             'created_at': user.registeredAt.toIso8601String(),
           })
@@ -434,7 +446,13 @@ class SupabaseSyncService {
 
     if (resetRemoteSupabase && _isInitialized) {
       try {
-        // Delete all attendance logs from Supabase
+        // Fetch and delete each attendance log by ID
+        final logs = await Supabase.instance.client.from('attendance_logs').select('id');
+        for (final row in logs) {
+          if (row['id'] != null) {
+            await Supabase.instance.client.from('attendance_logs').delete().eq('id', row['id']);
+          }
+        }
         await Supabase.instance.client
             .from('attendance_logs')
             .delete()
@@ -445,7 +463,13 @@ class SupabaseSyncService {
       }
 
       try {
-        // Delete all employees from Supabase
+        // Fetch and delete each employee by ID
+        final emps = await Supabase.instance.client.from('employees').select('id');
+        for (final row in emps) {
+          if (row['id'] != null) {
+            await Supabase.instance.client.from('employees').delete().eq('id', row['id']);
+          }
+        }
         await Supabase.instance.client
             .from('employees')
             .delete()

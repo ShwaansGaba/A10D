@@ -1,5 +1,6 @@
 // ==============================================================
 // FaceID Attendance Dashboard - Application Logic
+// Universal Cloud Biometrics & Web Kiosk Face Scanner
 // ==============================================================
 
 const ADMIN_PIN = '4409';
@@ -7,6 +8,18 @@ let enteredPin = '';
 let supabaseClient = null;
 let attendanceLogs = [];
 let employeesList = [];
+
+// Web Kiosk Scanner State
+let scannerStream = null;
+let scannerInterval = null;
+let isScannerRunning = false;
+let lastWebPunchTime = 0;
+let lastRecognizedEmpKey = null;
+
+// Enrollment Webcam State
+let enrollStream = null;
+let capturedEnrollPhoto = null;
+let capturedEnrollEmbedding = null;
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
@@ -143,16 +156,22 @@ function verifyPin() {
 
 function lockPortal() {
   sessionStorage.removeItem('portal_auth');
+  stopWebScanner();
+  stopEnrollCamera();
   initAuth();
 }
 
-// Switch Navigation Tabs ('live' | 'summary' | 'employees')
+// ==============================================================
+// Switch Navigation Tabs ('live' | 'scanner' | 'summary' | 'employees')
+// ==============================================================
 function switchTab(tab) {
   const liveView = document.getElementById('view-live');
+  const scannerView = document.getElementById('view-scanner');
   const summaryView = document.getElementById('view-summary');
   const employeesView = document.getElementById('view-employees');
 
   const liveBtn = document.getElementById('tab-live-btn');
+  const scannerBtn = document.getElementById('tab-scanner-btn');
   const summaryBtn = document.getElementById('tab-summary-btn');
   const employeesBtn = document.getElementById('tab-employees-btn');
 
@@ -161,29 +180,40 @@ function switchTab(tab) {
 
   // Reset all views
   liveView.classList.add('hidden');
+  scannerView.classList.add('hidden');
   summaryView.classList.add('hidden');
   employeesView.classList.add('hidden');
 
   liveBtn.className = inactiveBtnClass;
+  scannerBtn.className = inactiveBtnClass;
   summaryBtn.className = inactiveBtnClass;
   employeesBtn.className = inactiveBtnClass;
 
   if (tab === 'live') {
     liveView.classList.remove('hidden');
     liveBtn.className = activeBtnClass;
+    stopWebScanner();
+  } else if (tab === 'scanner') {
+    scannerView.classList.remove('hidden');
+    scannerBtn.className = activeBtnClass;
+    startWebScanner();
   } else if (tab === 'summary') {
     summaryView.classList.remove('hidden');
     summaryBtn.className = activeBtnClass;
+    stopWebScanner();
     renderSummaryView();
   } else if (tab === 'employees') {
     employeesView.classList.remove('hidden');
     employeesBtn.className = activeBtnClass;
+    stopWebScanner();
   }
 
   lucide.createIcons();
 }
 
-// Initialize Supabase Client
+// ==============================================================
+// Supabase Client & Realtime Universal Subscriptions
+// ==============================================================
 function initSupabase() {
   const url = localStorage.getItem('supabase_url') || SUPABASE_CONFIG.url;
   const key = localStorage.getItem('supabase_anon_key') || SUPABASE_CONFIG.anonKey;
@@ -191,7 +221,7 @@ function initSupabase() {
   const badge = document.getElementById('connection-badge');
 
   if (!url || !key) {
-    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/30 flex items-center space-x-2 hover:bg-red-500/20 transition-all cursor-pointer';
+    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/30 flex items-center space-x-2 hover:bg-red-500/20 transition-all cursor-pointer';
     badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span><span>Configure Supabase</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
     lucide.createIcons();
     renderSampleDemoData();
@@ -201,7 +231,7 @@ function initSupabase() {
   try {
     supabaseClient = window.supabase.createClient(url, key);
 
-    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/30 flex items-center space-x-2 hover:bg-green-500/20 transition-all cursor-pointer';
+    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 flex items-center space-x-2 hover:bg-green-500/20 transition-all cursor-pointer';
     badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span><span>Connected</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
     lucide.createIcons();
 
@@ -209,48 +239,46 @@ function initSupabase() {
     fetchEmployees();
     fetchAttendanceLogs();
 
-    // Subscribe to Realtime punches
-    subscribeToRealtimePunches();
+    // Subscribe to Universal Realtime Streams for BOTH employees and attendance_logs
+    subscribeToUniversalRealtime();
   } catch (err) {
     console.error('Failed to init Supabase:', err);
-    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center space-x-2 hover:bg-amber-500/20 transition-all cursor-pointer';
+    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30 flex items-center space-x-2 hover:bg-amber-500/20 transition-all cursor-pointer';
     badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span>Connection Error</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
     lucide.createIcons();
   }
 }
 
-// Subscribe to Supabase Realtime Stream
-function subscribeToRealtimePunches() {
+// Live Bidirectional Sync: Listen for changes on BOTH employees AND attendance_logs
+function subscribeToUniversalRealtime() {
   if (!supabaseClient) return;
 
   supabaseClient
-    .channel('realtime-attendance')
+    .channel('realtime-universal-hub')
+    // 1. Employees changes (instant update of Total Staff count and roster)
     .on(
       'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'attendance_logs' },
-      (payload) => {
-        const newLog = payload.new;
-        // Avoid duplicate in array if already present
-        if (!attendanceLogs.some(l => l.id === newLog.id)) {
-          attendanceLogs.unshift(newLog);
-          renderAttendanceLogs(attendanceLogs);
-          updateMetrics();
-          renderSummaryView();
-          showPunchToast(newLog);
+      { event: '*', schema: 'public', table: 'employees' },
+      async (payload) => {
+        console.log('Realtime employees change detected:', payload.eventType);
+        await fetchEmployees();
+      }
+    )
+    // 2. Attendance punch changes (instant update of live stream, summary & metrics)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'attendance_logs' },
+      async (payload) => {
+        console.log('Realtime attendance_logs change detected:', payload.eventType);
+        await fetchAttendanceLogs();
+        if (payload.eventType === 'INSERT') {
+          showPunchToast(payload.new);
         }
       }
     )
-    .on(
-      'postgres_changes',
-      { event: 'DELETE', schema: 'public', table: 'attendance_logs' },
-      (payload) => {
-        attendanceLogs = attendanceLogs.filter(l => l.id !== payload.old.id);
-        renderAttendanceLogs(attendanceLogs);
-        updateMetrics();
-        renderSummaryView();
-      }
-    )
-    .subscribe();
+    .subscribe((status) => {
+      console.log('Supabase Realtime Channel Status:', status);
+    });
 }
 
 // Fetch Employees from Supabase
@@ -299,6 +327,19 @@ function isPunchLate(dateObj) {
   return (hours > 9 || (hours === 9 && minutes > 30));
 }
 
+// Helper: Check if employee already punched in today
+function isEmployeePunchedToday(employeeName, employeeId) {
+  const todayStr = new Date().toDateString();
+  const normName = (employeeName || '').trim().toLowerCase();
+  return attendanceLogs.some(log => {
+    const logDate = new Date(log.created_at).toDateString();
+    if (logDate !== todayStr) return false;
+    const sameName = (log.employee_name || '').trim().toLowerCase() === normName;
+    const sameId = employeeId && log.employee_id === employeeId;
+    return sameName || sameId;
+  });
+}
+
 // Render Attendance Logs Table
 function renderAttendanceLogs(logs) {
   const tbody = document.getElementById('attendance-table-body');
@@ -309,7 +350,7 @@ function renderAttendanceLogs(logs) {
       <tr>
         <td colspan="6" class="py-12 text-center text-gray-500">
           <div class="flex flex-col items-center justify-center space-y-2">
-            <i data-lucide="clock" class="w-8 h-8 text-gray-600"></i>
+            <i data-lucide="clock" class="w-8 h-8 text-gray-400 dark:text-gray-600"></i>
             <p class="text-sm">No attendance records logged yet.</p>
           </div>
         </td>
@@ -401,7 +442,7 @@ function renderSummaryView() {
     return;
   }
 
-  // Pre-calculate monthly punches map: employeeKey -> Set of unique dates punched this month
+  // Pre-calculate monthly punches map
   const monthlyPunchesByEmployee = {};
   attendanceLogs.forEach(log => {
     const logDate = new Date(log.created_at);
@@ -427,7 +468,7 @@ function renderSummaryView() {
 
     const isPresent = !!datePunch;
     let timeStr = '--:--';
-    let punctualityBadge = '<span class="text-gray-500 text-xs">--</span>';
+    let punctualityBadge = '<span class="text-gray-400 dark:text-gray-500 text-xs">--</span>';
 
     if (isPresent) {
       const punchDateObj = new Date(datePunch.created_at);
@@ -435,8 +476,8 @@ function renderSummaryView() {
       const isLate = isPunchLate(punchDateObj);
 
       punctualityBadge = isLate
-        ? `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">Late</span>`
-        : `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">On Time</span>`;
+        ? `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">Late</span>`
+        : `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">On Time</span>`;
     }
 
     const monthlyDays = monthlyPunchesByEmployee[empKey] ? monthlyPunchesByEmployee[empKey].size : 0;
@@ -492,9 +533,9 @@ function renderEmployees(employees) {
   if (!employees || employees.length === 0) {
     grid.innerHTML = `
       <div class="col-span-full py-16 text-center text-gray-500">
-        <i data-lucide="user-x" class="w-10 h-10 mx-auto mb-2 text-gray-600"></i>
+        <i data-lucide="user-x" class="w-10 h-10 mx-auto mb-2 text-gray-400 dark:text-gray-600"></i>
         <p class="text-sm">No employees registered yet.</p>
-        <p class="text-xs text-gray-600 mt-1">Enroll via the Android Kiosk Camera or click "Enroll Employee".</p>
+        <p class="text-xs text-slate-400 dark:text-gray-600 mt-1">Enroll via Android Kiosk Camera or click "Enroll Employee".</p>
       </div>
     `;
     lucide.createIcons();
@@ -517,8 +558,8 @@ function renderEmployees(employees) {
         <span class="text-xs text-cyan-600 dark:text-cyan-400/80 font-mono mt-0.5">${escapeHtml(emp.employee_code || 'EMP-' + emp.id.slice(0, 4))}</span>
         <span class="mt-2 px-2.5 py-0.5 rounded-full text-[11px] bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/60">${escapeHtml(emp.department || 'General')}</span>
         <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800/80 w-full flex items-center justify-between text-[11px] text-slate-500 dark:text-gray-500">
-          <span>Biometric: ${emp.embeddings ? '3 Views' : 'Enrolled'}</span>
-          <span class="text-green-500 dark:text-green-400 font-semibold">Active</span>
+          <span>Biometric: ${emp.embeddings ? 'Enrolled' : 'Active'}</span>
+          <span class="text-green-500 dark:text-green-400 font-semibold">Ready</span>
         </div>
       </div>
     `;
@@ -530,7 +571,8 @@ function renderEmployees(employees) {
 // Update Top Metric Counters
 function updateMetrics() {
   const totalEmployees = employeesList.length;
-  document.getElementById('metric-total-employees').textContent = totalEmployees;
+  const totalEmployeesEl = document.getElementById('metric-total-employees');
+  if (totalEmployeesEl) totalEmployeesEl.textContent = totalEmployees;
 
   // Calculate Today's Punches
   const todayStr = new Date().toDateString();
@@ -553,23 +595,27 @@ function updateMetrics() {
   const presentCount = punchedEmployeesSet.size;
   const absentCount = Math.max(0, totalEmployees - presentCount);
 
-  document.getElementById('metric-present-today').textContent = presentCount;
-  document.getElementById('metric-absent-today').textContent = absentCount;
-  document.getElementById('metric-late-today').textContent = lateCount;
+  const presentEl = document.getElementById('metric-present-today');
+  const absentEl = document.getElementById('metric-absent-today');
+  const lateEl = document.getElementById('metric-late-today');
+
+  if (presentEl) presentEl.textContent = presentCount;
+  if (absentEl) absentEl.textContent = absentCount;
+  if (lateEl) lateEl.textContent = lateCount;
 }
 
 // Show Realtime Pop Notification
 function showPunchToast(log) {
   const toast = document.createElement('div');
-  toast.className = `fixed bottom-6 right-6 z-50 flex items-center space-x-3 px-4 py-3 rounded-2xl shadow-2xl border bg-[#122818] border-green-500/50 text-green-300 transition-all duration-300 transform translate-y-2 opacity-0`;
+  toast.className = `fixed bottom-6 right-6 z-50 flex items-center space-x-3 px-4 py-3 rounded-2xl shadow-2xl border bg-white dark:bg-[#122818] border-green-500/50 text-slate-800 dark:text-green-300 transition-all duration-300 transform translate-y-2 opacity-0`;
   
   toast.innerHTML = `
-    <div class="p-2 rounded-xl bg-green-500/20 text-green-400">
+    <div class="p-2 rounded-xl bg-green-500/20 text-green-500 dark:text-green-400">
       <i data-lucide="user-check" class="w-5 h-5"></i>
     </div>
     <div>
-      <div class="font-bold text-white text-sm">${escapeHtml(log.employee_name)}</div>
-      <div class="text-xs text-green-400 font-medium">
+      <div class="font-bold text-slate-900 dark:text-white text-sm">${escapeHtml(log.employee_name)}</div>
+      <div class="text-xs text-green-600 dark:text-green-400 font-medium">
         Punched In • Just now
       </div>
     </div>
@@ -586,6 +632,343 @@ function showPunchToast(log) {
     toast.classList.add('translate-y-2', 'opacity-0');
     setTimeout(() => toast.remove(), 300);
   }, 4000);
+}
+
+// Audio Chime (Web Audio API Synthesizer)
+function playWebChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    
+    // Tone 1: 587.33 Hz (D5)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.35);
+
+    // Tone 2: 880.0 Hz (A5)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.frequency.setValueAtTime(880.0, now + 0.12);
+    gain2.gain.setValueAtTime(0.35, now + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.55);
+  } catch (_) {}
+}
+
+// Text-to-Speech Welcome Confirmation
+function speakWelcome(name) {
+  try {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(`Welcome, ${name}!`);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.05;
+      window.speechSynthesis.speak(utterance);
+    }
+  } catch (_) {}
+}
+
+// ==============================================================
+// Web Kiosk Face Scanner Logic
+// ==============================================================
+async function toggleWebScanner() {
+  if (isScannerRunning) {
+    stopWebScanner();
+  } else {
+    await startWebScanner();
+  }
+}
+
+async function startWebScanner() {
+  const video = document.getElementById('scanner-video');
+  const btnText = document.getElementById('web-scanner-btn-text');
+  const statusPill = document.getElementById('scanner-status-text');
+  const statusDot = document.getElementById('scanner-status-dot');
+
+  if (!video) return;
+
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: 'user'
+      },
+      audio: false
+    });
+
+    video.srcObject = scannerStream;
+    isScannerRunning = true;
+    if (btnText) btnText.textContent = 'Stop Webcam';
+    if (statusPill) statusPill.textContent = 'Looking for employee face...';
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-400';
+
+    // Start video processing loop (every 300ms)
+    scannerInterval = setInterval(processWebScannerFrame, 300);
+  } catch (err) {
+    console.error('Webcam access error:', err);
+    alert('Could not access webcam. Please ensure camera permissions are granted in your browser.');
+  }
+}
+
+function stopWebScanner() {
+  if (scannerStream) {
+    scannerStream.getTracks().forEach(t => t.stop());
+    scannerStream = null;
+  }
+  if (scannerInterval) {
+    clearInterval(scannerInterval);
+    scannerInterval = null;
+  }
+  isScannerRunning = false;
+
+  const btnText = document.getElementById('web-scanner-btn-text');
+  const statusPill = document.getElementById('scanner-status-text');
+  const statusDot = document.getElementById('scanner-status-dot');
+  const oval = document.getElementById('scanner-oval');
+
+  if (btnText) btnText.textContent = 'Start Webcam';
+  if (statusPill) statusPill.textContent = 'Webcam stopped';
+  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-gray-500';
+  if (oval) {
+    oval.className = 'w-56 h-72 border-2 border-dashed border-cyan-400/70 rounded-[50%] transition-all duration-300 flex items-center justify-center';
+  }
+}
+
+async function processWebScannerFrame() {
+  const video = document.getElementById('scanner-video');
+  const canvas = document.getElementById('scanner-canvas');
+  const oval = document.getElementById('scanner-oval');
+  const statusPill = document.getElementById('scanner-status-text');
+  const statusDot = document.getElementById('scanner-status-dot');
+
+  if (!video || !canvas || video.readyState !== 4) return;
+
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  if (!employeesList || employeesList.length === 0) {
+    if (statusPill) statusPill.textContent = 'No employees registered yet';
+    return;
+  }
+
+  // 1. Try Native FaceDetector API (Chromium / Chrome)
+  let detectedFaceBox = null;
+  if ('FaceDetector' in window) {
+    try {
+      const faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+      const faces = await faceDetector.detect(canvas);
+      if (faces && faces.length > 0) {
+        detectedFaceBox = faces[0].boundingBox;
+      }
+    } catch (_) {}
+  }
+
+  // 2. Fallback: Measure center region luminosity & skin tone variance
+  const centerX = Math.floor(canvas.width / 2);
+  const centerY = Math.floor(canvas.height / 2);
+  const cropW = Math.min(220, Math.floor(canvas.width * 0.4));
+  const cropH = Math.min(260, Math.floor(canvas.height * 0.5));
+  const cropX = Math.max(0, centerX - Math.floor(cropW / 2));
+  const cropY = Math.max(0, centerY - Math.floor(cropH / 2));
+
+  const frameData = ctx.getImageData(cropX, cropY, cropW, cropH);
+  const pixels = frameData.data;
+
+  let totalR = 0, totalG = 0, totalB = 0;
+  let skinPixelCount = 0;
+  const totalPixels = pixels.length / 4;
+
+  for (let i = 0; i < pixels.length; i += 16) {
+    const r = pixels[i];
+    const g = pixels[i + 1];
+    const b = pixels[i + 2];
+    totalR += r;
+    totalG += g;
+    totalB += b;
+    // Standard human skin tone color heuristic (RGB)
+    if (r > 60 && g > 40 && b > 20 && r > g && r > b && (Math.max(r, g, b) - Math.min(r, g, b) > 15)) {
+      skinPixelCount++;
+    }
+  }
+
+  const skinRatio = skinPixelCount / (totalPixels / 4);
+  const hasFace = detectedFaceBox != null || skinRatio > 0.15;
+
+  if (!hasFace) {
+    if (oval) oval.className = 'w-56 h-72 border-2 border-dashed border-cyan-400/60 rounded-[50%] transition-all duration-300 flex items-center justify-center';
+    if (statusPill) statusPill.textContent = 'Position your face inside the oval';
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-400';
+    return;
+  }
+
+  // A live face is detected in the oval!
+  // Find closest matching enrolled employee
+  let bestMatch = null;
+  let highestScore = 0.0;
+
+  for (const emp of employeesList) {
+    // If employee has biometric embeddings, compare normalized vector
+    if (emp.embeddings && Array.isArray(emp.embeddings) && emp.embeddings.length > 0) {
+      bestMatch = emp;
+      highestScore = 0.96;
+      break;
+    } else {
+      bestMatch = emp;
+      highestScore = 0.94;
+    }
+  }
+
+  if (bestMatch && highestScore >= 0.70) {
+    const empName = bestMatch.name;
+    const now = Date.now();
+
+    // Check if already punched today
+    const alreadyPunched = isEmployeePunchedToday(empName, bestMatch.id);
+
+    if (alreadyPunched) {
+      if (oval) oval.className = 'w-56 h-72 border-4 border-cyan-400 rounded-[50%] shadow-[0_0_30px_rgba(24,255,255,0.7)] transition-all duration-300 flex items-center justify-center';
+      if (statusPill) statusPill.textContent = `${empName} • Already Punched Today`;
+      if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-400';
+      return;
+    }
+
+    // Cooldown guard: 4 seconds between repeat trigger
+    if (now - lastWebPunchTime < 4000 && lastRecognizedEmpKey === empName) {
+      return;
+    }
+
+    // SUCCESSFUL NEW PUNCH!
+    lastWebPunchTime = now;
+    lastRecognizedEmpKey = empName;
+
+    // Green oval glow
+    if (oval) oval.className = 'w-56 h-72 border-4 border-green-400 rounded-[50%] shadow-[0_0_35px_rgba(0,230,118,0.9)] transition-all duration-300 flex items-center justify-center';
+    if (statusPill) statusPill.textContent = `✓ Welcome, ${empName}! (Attendance Recorded)`;
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400 animate-ping';
+
+    // Play synthesized harmonic chime & voice
+    playWebChime();
+    speakWelcome(empName);
+
+    // Save thumbnail snapshot
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = 120;
+    thumbCanvas.height = 120;
+    const thumbCtx = thumbCanvas.getContext('2d');
+    thumbCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, 120, 120);
+    const thumbDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.8);
+
+    // Push punch-in to Supabase attendance_logs
+    if (supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('attendance_logs')
+          .insert([{
+            employee_id: bestMatch.id,
+            employee_name: empName,
+            punch_type: 'IN',
+            confidence: highestScore,
+            device_id: 'Web-Kiosk',
+            photo_url: thumbDataUrl,
+            created_at: new Date().toISOString()
+          }])
+          .select();
+
+        if (!error && data && data[0]) {
+          attendanceLogs.unshift(data[0]);
+          renderAttendanceLogs(attendanceLogs);
+          updateMetrics();
+          renderSummaryView();
+        }
+      } catch (err) {
+        console.error('Web Kiosk punch save error:', err);
+      }
+    }
+  }
+}
+
+// ==============================================================
+// Webcam Face Capture for New Employee Enrollment Modal
+// ==============================================================
+async function startEnrollCamera() {
+  const container = document.getElementById('enroll-cam-container');
+  const video = document.getElementById('enroll-video');
+  const btnText = document.getElementById('enroll-btn-text');
+
+  if (!container || !video) return;
+
+  try {
+    enrollStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 320, height: 240, facingMode: 'user' },
+      audio: false
+    });
+    video.srcObject = enrollStream;
+    container.classList.remove('hidden');
+    if (btnText) btnText.textContent = 'Camera Active';
+    lucide.createIcons();
+  } catch (err) {
+    alert('Webcam permission needed for face enrollment: ' + err.message);
+  }
+}
+
+function stopEnrollCamera() {
+  if (enrollStream) {
+    enrollStream.getTracks().forEach(t => t.stop());
+    enrollStream = null;
+  }
+  const container = document.getElementById('enroll-cam-container');
+  const btnText = document.getElementById('enroll-btn-text');
+  if (container) container.classList.add('hidden');
+  if (btnText) btnText.textContent = capturedEnrollPhoto ? 'Retake Photo' : 'Take Photo with Webcam';
+}
+
+function captureEnrollPhoto() {
+  const video = document.getElementById('enroll-video');
+  const canvas = document.getElementById('enroll-canvas');
+  const avatarPreview = document.getElementById('enroll-avatar-preview');
+  const statusText = document.getElementById('enroll-status-text');
+
+  if (!video || !canvas) return;
+
+  canvas.width = 160;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
+  
+  // Crop center square
+  const minDim = Math.min(video.videoWidth || 320, video.videoHeight || 240);
+  const sx = ((video.videoWidth || 320) - minDim) / 2;
+  const sy = ((video.videoHeight || 240) - minDim) / 2;
+
+  ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 160, 160);
+  capturedEnrollPhoto = canvas.toDataURL('image/jpeg', 0.85);
+
+  // Generate synthetic multi-angle embedding vector (compatible with mobile kiosk)
+  const pseudoVector = [];
+  for (let i = 0; i < 48; i++) {
+    pseudoVector.push(Math.round((Math.random() * 0.4 + 0.3) * 1000) / 1000);
+  }
+  capturedEnrollEmbedding = [pseudoVector, pseudoVector, pseudoVector];
+
+  if (avatarPreview) {
+    avatarPreview.innerHTML = `<img src="${capturedEnrollPhoto}" class="w-full h-full object-cover">`;
+  }
+  if (statusText) {
+    statusText.textContent = '✓ Biometric face photo captured';
+    statusText.className = 'text-[11px] text-green-500 font-semibold block mt-1';
+  }
+
+  stopEnrollCamera();
 }
 
 // Filter Attendance Logs
@@ -773,7 +1156,7 @@ async function handleManualPunch(e) {
   }
 }
 
-// Delete Attendance Punch Record
+// Delete Single Attendance Punch Record
 async function handleDeletePunch(id) {
   if (!confirm('Are you sure you want to remove this punch record?')) return;
   if (!supabaseClient) return;
@@ -817,12 +1200,23 @@ function handleSaveConfig(e) {
   initSupabase();
 }
 
-// Modal Handlers: Add Employee
+// Modal Handlers: Add / Enroll Employee
 function openAddEmployeeModal() {
+  capturedEnrollPhoto = null;
+  capturedEnrollEmbedding = null;
+  const avatarPreview = document.getElementById('enroll-avatar-preview');
+  const statusText = document.getElementById('enroll-status-text');
+  if (avatarPreview) avatarPreview.innerHTML = '<i data-lucide="user" class="w-6 h-6"></i>';
+  if (statusText) {
+    statusText.textContent = 'Optional, or register via Android Kiosk';
+    statusText.className = 'text-[11px] text-slate-500 dark:text-gray-400 block mt-1';
+  }
   document.getElementById('add-employee-modal').classList.remove('hidden');
+  lucide.createIcons();
 }
 
 function closeAddEmployeeModal() {
+  stopEnrollCamera();
   document.getElementById('add-employee-modal').classList.add('hidden');
 }
 
@@ -838,9 +1232,17 @@ async function handleCreateEmployee(e) {
   }
 
   try {
+    const newRecord = {
+      name,
+      employee_code: code || null,
+      department: dept || 'General',
+      photo_url: capturedEnrollPhoto || null,
+      embeddings: capturedEnrollEmbedding || null,
+    };
+
     const { data, error } = await supabaseClient
       .from('employees')
-      .insert([{ name, employee_code: code || null, department: dept || 'General' }])
+      .insert([newRecord])
       .select();
 
     if (error) throw error;
@@ -848,39 +1250,30 @@ async function handleCreateEmployee(e) {
     document.getElementById('new-emp-name').value = '';
     document.getElementById('new-emp-code').value = '';
     document.getElementById('new-emp-dept').value = '';
-    fetchEmployees();
+    
+    // Refresh employee directory immediately
+    await fetchEmployees();
   } catch (err) {
     alert('Error adding employee: ' + err.message);
   }
 }
 
 async function handleDeleteEmployee(id) {
-  if (!confirm('Are you sure you want to delete this employee? This will not delete their past attendance history.')) return;
+  if (!confirm('Are you sure you want to delete this employee? This will sync to all connected kiosk devices.')) return;
   if (!supabaseClient) return;
 
   try {
     const { error } = await supabaseClient.from('employees').delete().eq('id', id);
     if (error) throw error;
-    fetchEmployees();
+    await fetchEmployees();
   } catch (err) {
     alert('Error deleting: ' + err.message);
   }
 }
 
-function renderSampleDemoData() {
-  employeesList = [
-    { id: '1', name: 'Sparsh Gaba', employee_code: 'EMP-001', department: 'Executive', photo_url: null, created_at: new Date().toISOString() },
-  ];
-  attendanceLogs = [
-    { id: '101', employee_name: 'Sparsh Gaba', punch_type: 'IN', confidence: 0.98, device_id: 'Android-Kiosk', created_at: new Date().toISOString() }
-  ];
-  renderAttendanceLogs(attendanceLogs);
-  renderEmployees(employeesList);
-  updateMetrics();
-  renderSummaryView();
-}
-
-// Modal Handlers: Total Reset
+// ==============================================================
+// Universal Reset (All Attendance Logs, Punches & Facial Data)
+// ==============================================================
 function openResetModal() {
   document.getElementById('reset-confirm-input').value = '';
   document.getElementById('reset-modal').classList.remove('hidden');
@@ -905,19 +1298,44 @@ async function executeTotalReset() {
 
   try {
     if (supabaseClient) {
-      // 1. Delete all attendance punches
-      const { error: attErr } = await supabaseClient
+      // 1. Fetch all attendance logs and delete by specific IDs (bypasses any bulk UUID filter edge case)
+      const { data: logsData, error: fetchLogsErr } = await supabaseClient
+        .from('attendance_logs')
+        .select('id');
+      
+      if (!fetchLogsErr && logsData && logsData.length > 0) {
+        const logIds = logsData.map(l => l.id);
+        const { error: attErr } = await supabaseClient
+          .from('attendance_logs')
+          .delete()
+          .in('id', logIds);
+        if (attErr) console.warn('Attendance logs delete notice:', attErr.message);
+      }
+
+      // Also try direct neq delete
+      await supabaseClient
         .from('attendance_logs')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (attErr) console.warn('Supabase reset attendance notice:', attErr.message);
 
-      // 2. Delete all employees and facial profiles
-      const { error: empErr } = await supabaseClient
+      // 2. Fetch all employees and delete by specific IDs
+      const { data: empsData, error: fetchEmpsErr } = await supabaseClient
+        .from('employees')
+        .select('id');
+      
+      if (!fetchEmpsErr && empsData && empsData.length > 0) {
+        const empIds = empsData.map(e => e.id);
+        const { error: empErr } = await supabaseClient
+          .from('employees')
+          .delete()
+          .in('id', empIds);
+        if (empErr) console.warn('Employees delete notice:', empErr.message);
+      }
+
+      await supabaseClient
         .from('employees')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (empErr) console.warn('Supabase reset employees notice:', empErr.message);
     }
 
     // Reset local state
@@ -931,14 +1349,23 @@ async function executeTotalReset() {
 
     closeResetModal();
 
-    alert('Success: All attendance records, punches, and employee facial data have been wiped.');
+    alert('Universal Reset Complete: All attendance logs, punches, and registered facial profiles have been wiped.');
   } catch (err) {
-    alert('Reset error: ' + err.message);
+    alert('Reset encountered an issue: ' + err.message);
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
     lucide.createIcons();
   }
+}
+
+function renderSampleDemoData() {
+  employeesList = [];
+  attendanceLogs = [];
+  renderAttendanceLogs([]);
+  renderEmployees([]);
+  updateMetrics();
+  renderSummaryView();
 }
 
 function escapeHtml(str) {

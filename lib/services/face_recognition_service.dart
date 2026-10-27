@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
@@ -236,10 +237,29 @@ class FaceRecognitionService {
         } catch (_) {}
 
         if (parsedEmbeddings.isNotEmpty) {
+          String localPhotoPath = '';
+          final photoUrl = emp['photo_url'] as String?;
+          if (photoUrl != null && photoUrl.startsWith('data:image')) {
+            try {
+              final commaIdx = photoUrl.indexOf(',');
+              if (commaIdx != -1) {
+                final base64Str = photoUrl.substring(commaIdx + 1);
+                final bytes = base64Decode(base64Str);
+                final appDir = await getApplicationDocumentsDirectory();
+                final fileName = 'cloud_face_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                final file = File(p.join(appDir.path, fileName));
+                await file.writeAsBytes(bytes);
+                localPhotoPath = file.path;
+              }
+            } catch (_) {}
+          } else if (photoUrl != null && photoUrl.isNotEmpty) {
+            localPhotoPath = photoUrl;
+          }
+
           final newUser = RegisteredUser(
             id: empId,
             name: name.trim(),
-            photoPath: emp['photo_url'] ?? '',
+            photoPath: localPhotoPath,
             registeredAt: emp['created_at'] != null ? DateTime.tryParse(emp['created_at']) ?? DateTime.now() : DateTime.now(),
             embeddings: parsedEmbeddings,
           );

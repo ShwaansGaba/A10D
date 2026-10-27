@@ -119,6 +119,10 @@
             <i data-lucide="activity" class="w-4 h-4"></i>
             <span>Live Feed</span>
           </button>
+          <button id="tab-scanner-btn" onclick="switchTab('scanner')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center space-x-2">
+            <i data-lucide="camera" class="w-4 h-4 text-cyan-500"></i>
+            <span>Web Kiosk</span>
+          </button>
           <button id="tab-summary-btn" onclick="switchTab('summary')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center space-x-2">
             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
             <span>Attendance Summary</span>
@@ -260,7 +264,48 @@
       </div>
     </div>
 
-    <!-- VIEW 2: DAILY / MONTHLY ATTENDANCE SUMMARY -->
+    <!-- VIEW 2: WEB KIOSK / SCAN FACE THROUGH BROWSER -->
+    <div id="view-scanner" class="hidden space-y-6">
+      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-3xl p-6 shadow-sm dark:shadow-xl transition-colors">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+              <h2 class="text-lg font-bold text-slate-900 dark:text-white">Web Kiosk Face Scanner</h2>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-gray-400">Scan and record employee attendance live through your webcam</p>
+          </div>
+
+          <div class="flex items-center space-x-3">
+            <button id="web-scanner-toggle-btn" onclick="toggleWebScanner()" class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 text-white dark:text-black dark:bg-cyan-400 hover:bg-cyan-600 dark:hover:bg-cyan-300 flex items-center space-x-2 transition-all">
+              <i data-lucide="camera" class="w-4 h-4"></i>
+              <span id="web-scanner-btn-text">Start Webcam</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Camera Viewport with Oval Overlay -->
+        <div class="relative max-w-xl mx-auto aspect-[4/3] bg-black rounded-3xl overflow-hidden border-2 border-gray-300 dark:border-gray-800 shadow-2xl flex items-center justify-center">
+          <video id="scanner-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
+          <canvas id="scanner-canvas" class="hidden"></canvas>
+
+          <!-- Face Oval Guide -->
+          <div id="scanner-reticle" class="absolute pointer-events-none inset-0 flex items-center justify-center">
+            <div id="scanner-oval" class="w-56 h-72 border-2 border-dashed border-cyan-400/70 rounded-[50%] transition-all duration-300 flex items-center justify-center shadow-[0_0_20px_rgba(24,255,255,0.2)]">
+              <div class="w-full h-full rounded-[50%] border-2 border-cyan-400/20"></div>
+            </div>
+          </div>
+
+          <!-- Bottom Recognition Pill -->
+          <div id="scanner-status-pill" class="absolute bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-2xl bg-black/80 backdrop-blur-md border border-white/20 text-white flex items-center space-x-2.5 shadow-2xl">
+            <span id="scanner-status-dot" class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+            <span id="scanner-status-text" class="text-xs font-semibold">Start camera and position face inside oval</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: DAILY / MONTHLY ATTENDANCE SUMMARY -->
     <div id="view-summary" class="hidden space-y-6">
       <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-6 shadow-sm dark:shadow-xl transition-colors">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -299,7 +344,7 @@
       </div>
     </div>
 
-    <!-- VIEW 3: EMPLOYEES DIRECTORY -->
+    <!-- VIEW 4: EMPLOYEES DIRECTORY -->
     <div id="view-employees" class="hidden space-y-6">
       <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-6 shadow-sm dark:shadow-xl transition-colors">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -402,7 +447,7 @@
     </div>
   </div>
 
-  <!-- ADD EMPLOYEE MODAL -->
+  <!-- ADD / ENROLL EMPLOYEE MODAL (WITH WEBCAM BIOMETRIC CAPTURE) -->
   <div id="add-employee-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-white dark:bg-[#141B26] border border-cyan-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
       <div class="flex items-center justify-between mb-4">
@@ -426,6 +471,38 @@
           <input id="new-emp-dept" type="text" placeholder="Engineering, Operations, etc." class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
         </div>
 
+        <!-- Webcam Face Capture for Universal Biometric Sync -->
+        <div class="border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-slate-50 dark:bg-gray-900/50">
+          <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-2">Biometric Face Enrollment</label>
+          
+          <div id="enroll-cam-container" class="hidden mb-3">
+            <div class="relative w-full aspect-[4/3] max-w-[240px] mx-auto bg-black rounded-2xl overflow-hidden border border-cyan-400/40">
+              <video id="enroll-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
+              <canvas id="enroll-canvas" class="hidden"></canvas>
+            </div>
+            <div class="mt-2.5 flex justify-center space-x-2">
+              <button type="button" onclick="captureEnrollPhoto()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-green-500 text-white flex items-center space-x-1.5 shadow-md">
+                <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                <span>Capture Face</span>
+              </button>
+              <button type="button" onclick="stopEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-300 dark:bg-gray-700 text-slate-700 dark:text-gray-300">Cancel</button>
+            </div>
+          </div>
+
+          <div id="enroll-preview-container" class="flex items-center space-x-3">
+            <div id="enroll-avatar-preview" class="w-12 h-12 rounded-full bg-cyan-500/10 border-2 border-cyan-400/40 flex items-center justify-center text-cyan-500 font-bold text-sm overflow-hidden">
+              <i data-lucide="user" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <button type="button" onclick="startEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 flex items-center space-x-1.5 transition-all">
+                <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                <span id="enroll-btn-text">Take Photo with Webcam</span>
+              </button>
+              <span id="enroll-status-text" class="text-[11px] text-slate-500 dark:text-gray-400 block mt-1">Optional, or register via Android Kiosk</span>
+            </div>
+          </div>
+        </div>
+
         <div class="pt-3 flex justify-end space-x-3">
           <button type="button" onclick="closeAddEmployeeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800">Cancel</button>
           <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 dark:bg-cyan-400 text-white dark:text-black hover:bg-cyan-600 dark:hover:bg-cyan-300">Enroll Employee</button>
@@ -440,18 +517,19 @@
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center space-x-2.5">
           <div class="p-2 bg-red-500/10 rounded-xl text-red-500"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
-          <h3 class="text-lg font-bold text-slate-900 dark:text-white">Reset Database & Faces</h3>
+          <h3 class="text-lg font-bold text-slate-900 dark:text-white">Universal Reset (All Devices)</h3>
         </div>
         <button onclick="closeResetModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
       <p class="text-xs text-slate-600 dark:text-gray-300 leading-relaxed mb-4">
-        This action will permanently delete all attendance punches, logs, employee profiles, and biometric face data from Supabase.
+        This action will permanently delete all attendance punches, logs, employee profiles, and biometric face data across both the Cloud database, all Android Kiosks, and Web dashboards.
       </p>
 
       <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-600 dark:text-red-300 space-y-1 mb-4">
         <div>• <b>attendance_logs</b> table will be emptied</div>
         <div>• <b>employees</b> and facial embeddings will be wiped</div>
+        <div>• Android Kiosk local face models will clear automatically via live-sync</div>
         <div>• This cannot be undone</div>
       </div>
 
