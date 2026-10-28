@@ -1,12 +1,18 @@
 // ==============================================================
 // FaceID Attendance Dashboard - Application Logic
-// Universal Cloud Biometrics & Web Kiosk Face Scanner
-// ==============================================================
-
-// ==============================================================
-// FaceID Attendance Dashboard - Application Logic
 // Multi-Tenant Royal Blue Architecture & Active Kiosk Fleet Hub
 // ==============================================================
+
+// Safe wrapper to prevent Lucide errors from crashing script execution
+function safeCreateIcons() {
+  try {
+    if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  } catch (err) {
+    console.warn('Lucide icon render warning:', err);
+  }
+}
 
 let supabaseClient = null;
 let currentAuthUser = null;
@@ -45,10 +51,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initOtpBoxHandlers();
   initCaptchaSlider();
-  lucide.createIcons();
+  safeCreateIcons();
+
+  // Explicitly attach click listeners to auth buttons for 100% clickability
+  const linkGotoSignup = document.getElementById('link-goto-signup');
+  if (linkGotoSignup) {
+    linkGotoSignup.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchAuthMode('signup');
+    });
+  }
+  const linkGotoLogin = document.getElementById('link-goto-login');
+  if (linkGotoLogin) {
+    linkGotoLogin.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchAuthMode('login');
+    });
+  }
+  const tabBtnLogin = document.getElementById('tab-btn-login');
+  if (tabBtnLogin) {
+    tabBtnLogin.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchAuthMode('login');
+    });
+  }
+  const tabBtnSignup = document.getElementById('tab-btn-signup');
+  if (tabBtnSignup) {
+    tabBtnSignup.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchAuthMode('signup');
+    });
+  }
 
   initSupabase();
 });
+
+// Expose auth controllers to window for global inline accessibility
+window.switchAuthMode = switchAuthMode;
+window.goToSignupStep = goToSignupStep;
+window.goToSignupStep1 = goToSignupStep1;
+window.appendDomain = appendDomain;
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.handleLoginSubmit = handleLoginSubmit;
+window.handleSignupStep1Submit = handleSignupStep1Submit;
+window.handleSignupStep2Submit = handleSignupStep2Submit;
+window.handleSignupStep3Submit = handleSignupStep3Submit;
+window.resendOtpCode = resendOtpCode;
 
 // ==============================================================
 // Theme Toggle (Light / Dark Theme)
@@ -77,7 +125,7 @@ function applyTheme(theme) {
     if (icon) icon.setAttribute('data-lucide', 'moon');
     if (btn) btn.setAttribute('title', 'Switch to Dark Theme');
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // ==============================================================
@@ -174,26 +222,44 @@ function switchAuthMode(mode) {
 
   const tabLogin = document.getElementById('tab-btn-login');
   const tabSignup = document.getElementById('tab-btn-signup');
+  const tabLoginIcon = document.getElementById('tab-login-icon');
+  const tabLoginArrow = document.getElementById('tab-login-arrow');
+  const tabSignupIcon = document.getElementById('tab-signup-icon');
+
   const viewLogin = document.getElementById('auth-view-login');
   const viewSignup1 = document.getElementById('auth-view-signup-1');
   const viewSignup2 = document.getElementById('auth-view-signup-2');
   const viewSignup3 = document.getElementById('auth-view-signup-3');
 
   if (mode === 'login') {
-    tabLogin.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg';
-    tabSignup.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10';
+    if (tabLogin) {
+      tabLogin.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg cursor-pointer';
+    }
+    if (tabSignup) {
+      tabSignup.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10 cursor-pointer';
+    }
+    if (tabLoginIcon) tabLoginIcon.className = 'text-blue-600';
+    if (tabLoginArrow) tabLoginArrow.className = 'text-blue-600';
+    if (tabSignupIcon) tabSignupIcon.className = 'text-blue-300';
 
-    viewLogin.classList.remove('hidden');
-    viewSignup1.classList.add('hidden');
-    viewSignup2.classList.add('hidden');
-    viewSignup3.classList.add('hidden');
+    if (viewLogin) viewLogin.classList.remove('hidden');
+    if (viewSignup1) viewSignup1.classList.add('hidden');
+    if (viewSignup2) viewSignup2.classList.add('hidden');
+    if (viewSignup3) viewSignup3.classList.add('hidden');
   } else {
-    tabSignup.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg';
-    tabLogin.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10';
+    if (tabSignup) {
+      tabSignup.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg cursor-pointer';
+    }
+    if (tabLogin) {
+      tabLogin.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10 cursor-pointer';
+    }
+    if (tabSignupIcon) tabSignupIcon.className = 'text-blue-600';
+    if (tabLoginIcon) tabLoginIcon.className = 'text-blue-300';
+    if (tabLoginArrow) tabLoginArrow.className = 'text-blue-300';
 
     goToSignupStep(1);
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function goToSignupStep(step) {
@@ -205,25 +271,25 @@ function goToSignupStep(step) {
   const viewSignup2 = document.getElementById('auth-view-signup-2');
   const viewSignup3 = document.getElementById('auth-view-signup-3');
 
-  viewLogin.classList.add('hidden');
-  viewSignup1.classList.add('hidden');
-  viewSignup2.classList.add('hidden');
-  viewSignup3.classList.add('hidden');
+  if (viewLogin) viewLogin.classList.add('hidden');
+  if (viewSignup1) viewSignup1.classList.add('hidden');
+  if (viewSignup2) viewSignup2.classList.add('hidden');
+  if (viewSignup3) viewSignup3.classList.add('hidden');
 
   if (step === 1) {
-    viewSignup1.classList.remove('hidden');
+    if (viewSignup1) viewSignup1.classList.remove('hidden');
   } else if (step === 2) {
-    viewSignup2.classList.remove('hidden');
+    if (viewSignup2) viewSignup2.classList.remove('hidden');
     const emailDisp = document.getElementById('otp-target-email');
     if (emailDisp) emailDisp.innerText = pendingSignupEmail;
     clearOtpBoxes();
     focusFirstOtpBox();
     startResendCountdown();
   } else if (step === 3) {
-    viewSignup3.classList.remove('hidden');
+    if (viewSignup3) viewSignup3.classList.remove('hidden');
     resetCaptchaSlider();
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function goToSignupStep1() {
@@ -252,12 +318,15 @@ function togglePasswordVisibility(inputId, iconId) {
   if (!input) return;
   if (input.type === 'password') {
     input.type = 'text';
-    if (icon) icon.setAttribute('data-lucide', 'eye-off');
+    if (icon) {
+      icon.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`;
+    }
   } else {
     input.type = 'password';
-    if (icon) icon.setAttribute('data-lucide', 'eye');
+    if (icon) {
+      icon.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    }
   }
-  lucide.createIcons();
 }
 
 // Alert banner inside auth card
@@ -271,12 +340,15 @@ function showAuthAlert(msg, type = 'error') {
   text.innerText = msg;
   if (type === 'success') {
     box.className = 'mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-center space-x-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400';
-    if (icon) icon.setAttribute('data-lucide', 'check-circle-2');
+    if (icon) {
+      icon.innerHTML = `<svg class="w-4 h-4 shrink-0 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
+    }
   } else {
     box.className = 'mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-center space-x-2 bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400';
-    if (icon) icon.setAttribute('data-lucide', 'alert-circle');
+    if (icon) {
+      icon.innerHTML = `<svg class="w-4 h-4 shrink-0 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+    }
   }
-  lucide.createIcons();
 }
 
 function hideAuthAlert() {
@@ -304,7 +376,7 @@ async function handleLoginSubmit(e) {
 
   btn.disabled = true;
   btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Signing In...</span>';
-  lucide.createIcons();
+  safeCreateIcons();
 
   try {
     const { data, error } = await supabaseClient.auth.signInWithPassword({
@@ -322,7 +394,7 @@ async function handleLoginSubmit(e) {
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
-    lucide.createIcons();
+    safeCreateIcons();
   }
 }
 
@@ -346,7 +418,7 @@ async function handleSignupStep1Submit(e) {
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Sending Code...</span>';
-  lucide.createIcons();
+  safeCreateIcons();
 
   try {
     // Send 6-digit OTP code to the email using Supabase Auth signInWithOtp
@@ -365,7 +437,7 @@ async function handleSignupStep1Submit(e) {
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
-    lucide.createIcons();
+    safeCreateIcons();
   }
 }
 
@@ -385,7 +457,7 @@ async function handleSignupStep2Submit(e) {
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Verifying...</span>';
-  lucide.createIcons();
+  safeCreateIcons();
 
   try {
     const { data, error } = await supabaseClient.auth.verifyOtp({
@@ -403,7 +475,7 @@ async function handleSignupStep2Submit(e) {
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
-    lucide.createIcons();
+    safeCreateIcons();
   }
 }
 
@@ -435,7 +507,7 @@ async function handleSignupStep3Submit(e) {
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Activating Workspace...</span>';
-  lucide.createIcons();
+  safeCreateIcons();
 
   try {
     // Set the user's permanent password
@@ -459,7 +531,7 @@ async function handleSignupStep3Submit(e) {
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
-    lucide.createIcons();
+    safeCreateIcons();
   }
 }
 
@@ -632,8 +704,10 @@ function completeCaptcha() {
     status.innerText = '✓ Verified';
     status.className = 'text-[10px] text-emerald-500 font-bold';
   }
-  if (icon) icon.setAttribute('data-lucide', 'check');
-  lucide.createIcons();
+  if (icon) {
+    icon.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+  }
+  safeCreateIcons();
 }
 
 function resetCaptchaSlider() {
@@ -660,8 +734,10 @@ function resetCaptchaSlider() {
     status.innerText = 'Slide to complete';
     status.className = 'text-[10px] text-amber-500 font-bold';
   }
-  if (icon) icon.setAttribute('data-lucide', 'chevrons-right');
-  lucide.createIcons();
+  if (icon) {
+    icon.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>`;
+  }
+  safeCreateIcons();
 }
 
 async function handleForgotPassword() {
@@ -730,7 +806,7 @@ function renderActiveKiosks() {
         <p class="text-[11px] mt-1 max-w-xs mx-auto">Open the FaceID Android app on your phone, log in with this account, and it will immediately appear here as an active kiosk.</p>
       </div>
     `;
-    lucide.createIcons();
+    safeCreateIcons();
     return;
   }
 
@@ -765,7 +841,7 @@ function renderActiveKiosks() {
       </div>
     `;
   }).join('');
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function openKiosksModal() {
@@ -774,7 +850,7 @@ function openKiosksModal() {
     modal.classList.remove('hidden');
     fetchActiveKiosks();
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function closeKiosksModal() {
@@ -829,7 +905,7 @@ function switchTab(tab) {
     stopWebScanner();
   }
 
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // ==============================================================
@@ -844,7 +920,7 @@ function initSupabase() {
   if (!url || !key) {
     badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/30 flex items-center space-x-2 hover:bg-red-500/20 transition-all cursor-pointer';
     badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span><span>Configure Supabase</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
-    lucide.createIcons();
+    safeCreateIcons();
     renderSampleDemoData();
     return;
   }
@@ -854,7 +930,7 @@ function initSupabase() {
 
     badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 flex items-center space-x-2 hover:bg-green-500/20 transition-all cursor-pointer';
     badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span><span>Connected</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
-    lucide.createIcons();
+    safeCreateIcons();
 
     // Initialize Auth Session Check
     initAuth();
@@ -862,7 +938,7 @@ function initSupabase() {
     console.error('Failed to init Supabase:', err);
     badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30 flex items-center space-x-2 hover:bg-amber-500/20 transition-all cursor-pointer';
     badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span>Connection Error</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
-    lucide.createIcons();
+    safeCreateIcons();
   }
 }
 
@@ -991,7 +1067,7 @@ function renderAttendanceLogs(logs) {
         </td>
       </tr>
     `;
-    lucide.createIcons();
+    safeCreateIcons();
     return;
   }
 
@@ -1048,7 +1124,7 @@ function renderAttendanceLogs(logs) {
     `;
   }).join('');
 
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // Render Daily & Monthly Attendance Summary View
@@ -1073,7 +1149,7 @@ function renderSummaryView() {
         </td>
       </tr>
     `;
-    lucide.createIcons();
+    safeCreateIcons();
     return;
   }
 
@@ -1157,7 +1233,7 @@ function renderSummaryView() {
     `;
   }).join('');
 
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // Render Employees Directory Grid
@@ -1173,7 +1249,7 @@ function renderEmployees(employees) {
         <p class="text-xs text-slate-400 dark:text-gray-600 mt-1">Enroll via Android Kiosk Camera or click "Enroll Employee".</p>
       </div>
     `;
-    lucide.createIcons();
+    safeCreateIcons();
     return;
   }
 
@@ -1200,7 +1276,7 @@ function renderEmployees(employees) {
     `;
   }).join('');
 
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // Update Top Metric Counters
@@ -1257,7 +1333,7 @@ function showPunchToast(log) {
   `;
 
   document.body.appendChild(toast);
-  lucide.createIcons();
+  safeCreateIcons();
 
   requestAnimationFrame(() => {
     toast.classList.remove('translate-y-2', 'opacity-0');
@@ -1552,7 +1628,7 @@ async function startEnrollCamera() {
     video.srcObject = enrollStream;
     container.classList.remove('hidden');
     if (btnText) btnText.textContent = 'Camera Active';
-    lucide.createIcons();
+    safeCreateIcons();
   } catch (err) {
     alert('Webcam permission needed for face enrollment: ' + err.message);
   }
@@ -1854,7 +1930,7 @@ function openAddEmployeeModal() {
     statusText.className = 'text-[11px] text-slate-500 dark:text-gray-400 block mt-1';
   }
   document.getElementById('add-employee-modal').classList.remove('hidden');
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function closeAddEmployeeModal() {
@@ -1941,7 +2017,7 @@ async function executeTotalReset() {
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Resetting...</span>';
-  lucide.createIcons();
+  safeCreateIcons();
 
   try {
     if (supabaseClient) {
@@ -2025,14 +2101,14 @@ async function executeTotalReset() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
-    lucide.createIcons();
+    safeCreateIcons();
   }
 }
 
 function showRlsFixModal() {
   const modal = document.getElementById('rls-fix-modal');
   if (modal) modal.classList.remove('hidden');
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function closeRlsFixModal() {
