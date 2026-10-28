@@ -145,6 +145,11 @@ async function initAuth() {
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session && session.user) {
+      if (session.user.user_metadata && session.user.user_metadata.account_deleted === true) {
+        await supabaseClient.auth.signOut();
+        showAuthOverlay();
+        return;
+      }
       handleAuthSuccess(session.user);
     } else {
       showAuthOverlay();
@@ -158,6 +163,11 @@ async function initAuth() {
   supabaseClient.auth.onAuthStateChange((event, session) => {
     console.log('Supabase Auth State Event:', event);
     if (session && session.user) {
+      if (session.user.user_metadata && session.user.user_metadata.account_deleted === true) {
+        supabaseClient.auth.signOut();
+        showAuthOverlay();
+        return;
+      }
       handleAuthSuccess(session.user);
     } else if (event === 'SIGNED_OUT') {
       currentAuthUser = null;
@@ -401,10 +411,19 @@ async function handleLoginSubmit(e) {
 
   const emailInput = document.getElementById('login-email');
   const passwordInput = document.getElementById('login-password');
-  const email = emailInput ? emailInput.value.trim() : '';
+  const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
   const password = passwordInput ? passwordInput.value : '';
   const btn = document.getElementById('login-btn') || document.getElementById('login-submit-btn');
   const originalHtml = btn ? btn.innerHTML : '<span>Sign In</span>';
+
+  // Check if account was previously marked deleted
+  try {
+    const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
+    if (deletedList.includes(email)) {
+      showAuthAlert('This account has been permanently deleted. Please create a new account.');
+      return;
+    }
+  } catch (_) {}
 
   if (btn) {
     btn.disabled = true;
@@ -420,6 +439,10 @@ async function handleLoginSubmit(e) {
 
     if (error) throw error;
     if (data && data.user) {
+      if (data.user.user_metadata && data.user.user_metadata.account_deleted === true) {
+        await supabaseClient.auth.signOut();
+        throw new Error('This account has been permanently deleted. Please create a new account.');
+      }
       handleAuthSuccess(data.user);
     }
   } catch (err) {
@@ -443,7 +466,8 @@ async function handleSignupStep1Submit(e) {
     return;
   }
 
-  const email = document.getElementById('signup-email').value.trim();
+  const emailInput = document.getElementById('signup-email');
+  const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
   if (!email || !email.includes('@')) {
     showAuthAlert('Please enter a valid work email address.');
     return;
@@ -454,12 +478,34 @@ async function handleSignupStep1Submit(e) {
   const originalHtml = btn ? btn.innerHTML : '<span>Send Verification Code</span>';
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span>Sending Code...</span>';
+    btn.innerHTML = '<span>Checking Email...</span>';
   }
   safeCreateIcons();
 
   try {
-    // Send OTP code to the email using Supabase Auth signInWithOtp
+    // 1. Check if this email is already registered in Supabase
+    const { data: checkData, error: checkError } = await supabaseClient.auth.signInWithOtp({
+      email: pendingSignupEmail,
+      options: {
+        shouldCreateUser: false,
+      }
+    });
+
+    if (!checkError) {
+      // Email is ALREADY registered in Supabase!
+      // Pre-fill the login email input and return to the login page as requested
+      const loginEmailInput = document.getElementById('login-email');
+      if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
+
+      switchAuthMode('login');
+      showAuthAlert('This email is already registered. Please sign in with your password.', 'error');
+      return;
+    }
+
+    // 2. Email is not registered - proceed to send OTP code with shouldCreateUser: true
+    if (btn) {
+      btn.innerHTML = '<span>Sending Code...</span>';
+    }
     const redirectUrl = window.location.origin ? (window.location.origin + window.location.pathname) : undefined;
     const { data, error } = await supabaseClient.auth.signInWithOtp({
       email: pendingSignupEmail,
@@ -1302,6 +1348,7 @@ async function executeAccountDeletion() {
 
   try {
     const userId = currentAuthUser.id;
+    const userEmail = (currentAuthUser.email || '').toLowerCase().trim();
 
     // 1. Delete all attendance logs for this user/tenant
     try {
@@ -1324,7 +1371,35 @@ async function executeAccountDeletion() {
       console.warn('Kiosks delete error:', e.message);
     }
 
-    // 4. Sign out
+    // 4. Invalidate credentials permanently so old password can NEVER authenticate again
+    const unguessablePassword = 'DELETED_' + crypto.randomUUID() + '_' + Math.random().toString(36) + '_' + Date.now();
+    try {
+      await supabaseClient.auth.updateUser({
+        password: unguessablePassword,
+        data: {
+          account_deleted: true,
+          deleted_at: new Date().toISOString()
+        }
+      });
+    } catch (e) {
+      console.warn('Credentials invalidation notice:', e.message);
+    }
+
+    // 5. Try RPC delete_user if supported on Supabase
+    try {
+      await supabaseClient.rpc('delete_user');
+    } catch (_) {}
+
+    // 6. Record in local deleted accounts list
+    try {
+      const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
+      if (userEmail && !deletedList.includes(userEmail)) {
+        deletedList.push(userEmail);
+        localStorage.setItem('a10d_deleted_accounts', JSON.stringify(deletedList));
+      }
+    } catch (_) {}
+
+    // 7. Sign out permanently
     await supabaseClient.auth.signOut();
 
     // 5. Clear all local tenant state
@@ -2073,7 +2148,7 @@ async function processWebScannerFrame() {
     // Green oval glow
     if (oval) oval.className = 'w-56 h-72 border-4 border-green-400 rounded-[50%] shadow-[0_0_35px_rgba(0,230,118,0.9)] transition-all duration-300 flex items-center justify-center';
     if (statusPill) statusPill.textContent = `✓ Welcome, ${empName}! (Attendance Recorded)`;
-    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400 animate-ping';
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
 
     // Play synthesized harmonic chime & voice
     playWebChime();

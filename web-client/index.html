@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>A10D | Face Biometrics & Fleet Portal</title>
+  <title>A10D | Attendance Management System</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
@@ -32,14 +32,6 @@
     }
   </script>
   <style>
-    @keyframes pulse-ring {
-      0% { transform: scale(0.95); opacity: 0.8; }
-      50% { transform: scale(1.15); opacity: 0.3; }
-      100% { transform: scale(0.95); opacity: 0.8; }
-    }
-    .pulse-indicator {
-      animation: pulse-ring 2s infinite ease-in-out;
-    }
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -93,8 +85,7 @@
         <!-- Typography & Brand Info -->
         <div class="relative z-20">
           <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 w-max mb-6 shadow-sm">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="text-[11px] font-bold tracking-wider uppercase text-blue-100">A10D Fleet OS</span>
+            <span class="text-[11px] font-bold tracking-wider uppercase text-blue-100">Attendance Portal</span>
           </div>
 
           <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase leading-none mb-2 text-white drop-shadow-sm">
@@ -104,7 +95,7 @@
             A10D ATTENDANCE
           </p>
           <p class="text-xs sm:text-sm text-blue-100/85 leading-relaxed max-w-xs font-normal">
-            Enterprise AI facial biometrics kiosk fleet & real-time SaaS attendance tracking platform.
+            Welcome to A10D Attendance Management System. Track daily attendance, manage staff, and view real-time reports with ease.
           </p>
         </div>
 
@@ -157,15 +148,12 @@
                 </div>
               </div>
 
-              <!-- Options Row: Remember me + Forgot Password -->
-              <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
+              <!-- Options Row: Remember me -->
+              <div class="flex items-center text-xs text-slate-500 dark:text-slate-400 pt-0.5">
                 <label class="flex items-center space-x-2 cursor-pointer select-none">
                   <input type="checkbox" id="login-remember-me" checked class="w-3.5 h-3.5 rounded border-slate-300 text-[#18468b] focus:ring-[#18468b] cursor-pointer">
                   <span class="text-[11px] font-medium text-slate-600 dark:text-slate-300">Remember me</span>
                 </label>
-                <button type="button" onclick="alert('Forgot password? Please re-verify your work email through the Sign Up tab or contact your administrator.')" class="text-[11px] text-slate-500 hover:text-[#18468b] dark:hover:text-blue-400 font-medium transition-colors cursor-pointer">
-                  Forgot Password?
-                </button>
               </div>
 
               <!-- Primary Submit Button: Sign in -->
@@ -175,17 +163,6 @@
                 </button>
               </div>
             </form>
-
-            <!-- "Or" Divider -->
-            <div class="relative flex items-center justify-center my-3">
-              <div class="border-t border-slate-200 dark:border-slate-700/80 w-full"></div>
-              <span class="bg-white dark:bg-[#151B28] px-3 text-[11px] font-medium text-slate-400 uppercase tracking-widest absolute">Or</span>
-            </div>
-
-            <!-- Secondary Button: Sign in with other -->
-            <button type="button" onclick="quickFillDemoWorkspace()" class="w-full py-3 px-4 bg-white dark:bg-slate-800/80 border border-slate-700 dark:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-[0.99] text-slate-800 dark:text-slate-200 font-semibold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2">
-              <span>Sign in with other</span>
-            </button>
 
             <!-- Footer: Don't have an account? Sign up -->
             <div class="text-center text-xs text-slate-500 dark:text-slate-400 pt-3">
@@ -464,8 +441,8 @@
           </div>
 
           <!-- Active Kiosks Fleet Button -->
-          <button onclick="openKiosksModal()" id="active-kiosks-btn" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center space-x-1.5 hover:bg-emerald-100 transition-all shrink-0 cursor-pointer" title="View Active Hardware Fleet">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <button onclick="openKiosksModal()" id="active-kiosks-btn" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center space-x-1.5 hover:bg-emerald-100 transition-all shrink-0 cursor-pointer" title="View Active Devices">
+            <i data-lucide="tablet" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i>
             <span id="active-kiosks-text">0 Kiosks Active</span>
           </button>
 
@@ -513,10 +490,10 @@
             <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
                 <div class="flex items-center space-x-3">
-                  <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <i data-lucide="activity" class="w-5 h-5 text-[#5D50A2]"></i>
                   <div>
                     <h2 class="text-lg font-bold text-slate-900 dark:text-white">Live Attendance Stream</h2>
-                    <p class="text-xs text-slate-400">Realtime biometric punches from Android Kiosks & Web Terminals</p>
+                    <p class="text-xs text-slate-400">Realtime attendance punches from Android Kiosks & Web Terminals</p>
                   </div>
                 </div>
 
@@ -563,7 +540,7 @@
                   </div>
                   <div>
                     <h3 class="font-bold text-base">Active Kiosks</h3>
-                    <p class="text-xs text-purple-200">Connected Terminal Fleet</p>
+                    <p class="text-xs text-purple-200">Connected Attendance Devices</p>
                   </div>
                 </div>
                 <div class="flex items-end justify-between">
@@ -572,7 +549,7 @@
                     <span class="text-xs text-purple-200 ml-1">online</span>
                   </div>
                   <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/15 text-white flex items-center space-x-1">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                     <span>Live Ping</span>
                   </span>
                 </div>
@@ -672,7 +649,7 @@
             <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
               <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div class="flex items-center space-x-3">
-                  <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <i data-lucide="clock" class="w-5 h-5 text-[#5D50A2]"></i>
                   <div>
                     <h2 class="text-lg font-bold text-slate-900 dark:text-white">Historical Attendance Logs</h2>
                     <p class="text-xs text-slate-400">Complete archive of attendance punch records</p>
@@ -970,20 +947,20 @@
           <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-5 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center space-x-2">
-                <i data-lucide="map-pin" class="w-4 h-4 text-[#FF5C7E]"></i>
-                <h3 class="font-bold text-sm text-slate-900 dark:text-white">A10D Hardware Fleet</h3>
+                <i data-lucide="tablet" class="w-4 h-4 text-[#5D50A2]"></i>
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white">Attendance Devices</h3>
               </div>
-              <button onclick="openKiosksModal()" class="text-[11px] font-semibold text-[#5D50A2] dark:text-purple-300 hover:underline">View Fleet</button>
+              <button onclick="openKiosksModal()" class="text-[11px] font-semibold text-[#5D50A2] dark:text-purple-300 hover:underline">View Devices</button>
             </div>
 
             <!-- Visual Kiosk Graphic -->
             <div class="relative h-28 bg-gradient-to-br from-slate-100 to-purple-50 dark:from-slate-800/80 dark:to-[#1a2233] rounded-2xl overflow-hidden p-3 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
               <div class="space-y-1">
-                <span class="text-[11px] font-bold text-slate-700 dark:text-white block">Connected Hardware</span>
-                <span id="sidebar-kiosks-status-text" class="text-[10px] text-slate-400 block">Universal Biometrics Active</span>
+                <span class="text-[11px] font-bold text-slate-700 dark:text-white block">Connected Devices</span>
+                <span id="sidebar-kiosks-status-text" class="text-[10px] text-slate-400 block">Attendance System Active</span>
                 <div class="flex items-center space-x-1 mt-2">
-                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Zero-Latency Sync</span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Sync Active</span>
                 </div>
               </div>
 
@@ -1229,8 +1206,8 @@
 
       <div class="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
         <span class="flex items-center space-x-1.5">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Live WebSocket Heartbeat Active</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>WebSocket Connected</span>
         </span>
         <button type="button" onclick="closeKiosksModal()" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-gray-300">Close</button>
       </div>
