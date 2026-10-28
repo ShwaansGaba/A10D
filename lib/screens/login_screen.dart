@@ -171,10 +171,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.face_retouching_natural,
-                        size: 44,
-                        color: Colors.white,
+                      child: ClipOval(
+                        child: Padding(
+                          padding: const EdgeInsets.all(10.0),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -297,7 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                             ),
-                            hintText: '••••••••',
+                            hintText: 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢',
                             hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
                             filled: true,
                             fillColor: const Color(0xFF0B1324),

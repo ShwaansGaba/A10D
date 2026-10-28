@@ -322,12 +322,20 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              width: 38,
+              height: 38,
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.manage_accounts_rounded, color: Colors.blueAccent, size: 24),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             const Column(
