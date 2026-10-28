@@ -987,9 +987,6 @@ function subscribeToUniversalRealtime() {
       console.log('Supabase Realtime Channel Status:', status);
     });
 }
-      console.log('Supabase Realtime Channel Status:', status);
-    });
-}
 
 // Fetch Employees from Supabase (Scoped to Authenticated Tenant)
 async function fetchEmployees() {
@@ -2074,7 +2071,6 @@ async function executeTotalReset() {
       }
       const { data: checkLogs } = await checkLogsQ;
       const { data: checkEmps } = await checkEmpsQ;
-      const { data: checkEmps } = await supabaseClient.from('employees').select('id').limit(5);
 
       if ((checkLogs && checkLogs.length > 0) || (checkEmps && checkEmps.length > 0)) {
         console.warn('Supabase RLS prevented deletion. Records still present on server.');
