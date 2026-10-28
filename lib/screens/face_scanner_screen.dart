@@ -10,6 +10,7 @@ import '../services/audio_feedback_service.dart';
 import '../services/face_recognition_service.dart';
 import '../services/supabase_sync_service.dart';
 import '../widgets/face_overlay_painter.dart';
+import 'login_screen.dart';
 import 'register_face_screen.dart';
 
 class FaceScannerScreen extends StatefulWidget {
@@ -42,8 +43,6 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
   bool _isKioskDimmed = false;
 
   late AnimationController _scannerAnimationController;
-
-  static const String _adminPin = '4409';
 
   @override
   void initState() {
@@ -274,7 +273,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     }
   }
 
-  Future<void> _promptAdminPinAndOpenRegister() async {
+  Future<void> _navigateToRegister() async {
     _wakeKiosk();
     _stopLiveScanLoop();
     if (_cameraController != null) {
@@ -289,117 +288,12 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
     if (!mounted) return;
 
-    final pinController = TextEditingController();
-    String? errorMessage;
-
-    final authenticated = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF161A20),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: Colors.cyanAccent, width: 1.2),
-              ),
-              title: const Row(
-                children: [
-                  Icon(Icons.lock_outline_rounded, color: Colors.cyanAccent, size: 24),
-                  SizedBox(width: 10),
-                  Text(
-                    'Admin Authentication',
-                    style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Enter 4-digit PIN to register a new employee face:',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: pinController,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    autofocus: true,
-                    maxLength: 4,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      letterSpacing: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    decoration: InputDecoration(
-                      counterText: '',
-                      filled: true,
-                      fillColor: Colors.black38,
-                      errorText: errorMessage,
-                      errorStyle: const TextStyle(color: Colors.redAccent),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.white24),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.cyanAccent, width: 2),
-                      ),
-                    ),
-                    onSubmitted: (val) {
-                      if (val == _adminPin) {
-                        Navigator.of(ctx).pop(true);
-                      } else {
-                        setDialogState(() {
-                          errorMessage = 'Incorrect PIN';
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.cyanAccent,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    if (pinController.text.trim() == _adminPin) {
-                      Navigator.of(ctx).pop(true);
-                    } else {
-                      setDialogState(() {
-                        errorMessage = 'Incorrect PIN';
-                      });
-                    }
-                  },
-                  child: const Text('Unlock', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => RegisterFaceScreen(cameras: widget.cameras),
+      ),
     );
-
-    if (authenticated == true && mounted) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (ctx) => RegisterFaceScreen(cameras: widget.cameras),
-        ),
-      );
-      await SupabaseSyncService().syncAllFromRemote();
-    }
+    await SupabaseSyncService().syncAllFromRemote();
 
     await FaceRecognitionService().cleanCache();
     if (mounted) {
@@ -407,108 +301,12 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     }
   }
 
-  /// Admin PIN Dialog & Full System Reset
+  /// Direct Full System Reset with Safety Confirmation
   Future<void> _promptAdminReset() async {
-    final pinController = TextEditingController();
-    String? errorMessage;
+    _wakeKiosk();
+    if (!mounted) return;
 
-    final authenticated = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF161F2E),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Row(
-                children: [
-                  Icon(Icons.lock_outline_rounded, color: Colors.redAccent),
-                  SizedBox(width: 8),
-                  Text('Admin Verification', style: TextStyle(color: Colors.white, fontSize: 18)),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Enter 4-digit PIN to reset logs, punches, and faces:',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: pinController,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    autofocus: true,
-                    maxLength: 4,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      letterSpacing: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    decoration: InputDecoration(
-                      counterText: '',
-                      filled: true,
-                      fillColor: Colors.black38,
-                      errorText: errorMessage,
-                      errorStyle: const TextStyle(color: Colors.redAccent),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.white24),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.redAccent, width: 2),
-                      ),
-                    ),
-                    onSubmitted: (val) {
-                      if (val == _adminPin) {
-                        Navigator.of(ctx).pop(true);
-                      } else {
-                        setDialogState(() {
-                          errorMessage = 'Incorrect PIN';
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    if (pinController.text.trim() == _adminPin) {
-                      Navigator.of(ctx).pop(true);
-                    } else {
-                      setDialogState(() {
-                        errorMessage = 'Incorrect PIN';
-                      });
-                    }
-                  },
-                  child: const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (authenticated != true || !mounted) return;
-
-    // Double confirmation dialog
+    // Safety confirmation dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -583,6 +381,62 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     }
   }
 
+  /// Kiosk Sign Out / Disconnect from Workspace
+  Future<void> _promptKioskLogout() async {
+    _wakeKiosk();
+    final email = SupabaseSyncService().currentUserEmail ?? 'your workspace';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131D33),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFF1D4ED8), width: 1.2),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.power_settings_new_rounded, color: Colors.blueAccent, size: 24),
+            SizedBox(width: 10),
+            Text(
+              'Sign Out Kiosk',
+              style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'Disconnect this device from $email?\n\nThis terminal will stop reporting attendance and will immediately show as OFFLINE in your web dashboard.',
+          style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      _stopLiveScanLoop();
+      await SupabaseSyncService().logout();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(cameras: widget.cameras),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isPersonRecognized = _recognizedUser != null;
@@ -653,14 +507,14 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
                 },
               ),
 
-              // 3. Top-Left "+" Icon to Register New Face (PIN: 4409)
+              // 3. Top-Left "+" Icon to Register New Face
               Positioned(
                 top: 14,
                 left: 14,
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: _promptAdminPinAndOpenRegister,
+                    onTap: _navigateToRegister,
                     borderRadius: BorderRadius.circular(24),
                     child: Container(
                       padding: const EdgeInsets.all(10),
@@ -679,7 +533,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
                 ),
               ),
 
-              // 3b. Top-Left Reset Icon to Wipe Logs & Faces (PIN: 4409)
+              // 3b. Top-Left Reset Icon to Wipe Logs & Faces
               Positioned(
                 top: 14,
                 left: 68,
@@ -698,6 +552,32 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
                       child: const Icon(
                         Icons.restart_alt_rounded,
                         color: Colors.redAccent,
+                        size: 26,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 3c. Top-Left Kiosk Sign Out Icon
+              Positioned(
+                top: 14,
+                left: 122,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _promptKioskLogout,
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF1D4ED8).withValues(alpha: 0.6), width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.power_settings_new_rounded,
+                        color: Colors.blueAccent,
                         size: 26,
                       ),
                     ),

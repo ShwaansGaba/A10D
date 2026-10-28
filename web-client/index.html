@@ -51,51 +51,323 @@
 <body class="bg-slate-100 dark:bg-[#0A0E14] text-slate-800 dark:text-gray-100 min-h-screen font-sans antialiased transition-colors duration-200">
 
   <!-- ============================================================== -->
-  <!-- PIN CODE LOGIN GATEKEEPER (PIN: 4409) -->
+  <!-- ROYAL BLUE MULTI-TENANT AUTH GATEWAY (LOGIN & SMART SIGN UP) -->
   <!-- ============================================================== -->
-  <div id="auth-overlay" class="fixed inset-0 z-50 bg-slate-900/90 dark:bg-[#06080D]/95 backdrop-blur-md flex items-center justify-center p-4">
-    <div id="auth-card" class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-cyan-500/30 rounded-3xl max-w-sm w-full p-8 shadow-2xl relative text-center">
-      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-cyan-500/10 border border-cyan-400/40 flex items-center justify-center text-cyan-500 dark:text-cyan-400 shadow-inner">
-        <i data-lucide="shield-check" class="w-9 h-9"></i>
-      </div>
+  <div id="auth-overlay" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div id="auth-card" class="bg-white dark:bg-[#0F1626] border border-blue-900/30 dark:border-blue-600/30 rounded-3xl max-w-4xl w-full shadow-2xl relative overflow-hidden flex flex-col md:flex-row my-auto transition-all">
       
-      <h2 class="text-xl font-extrabold text-slate-900 dark:text-white">Admin Authentication</h2>
-      <p class="text-xs text-slate-500 dark:text-gray-400 mt-1.5">Enter 4-digit PIN to access HR portal</p>
+      <!-- LEFT BRAND & NAVIGATION PANEL (Royal Blue Architectural Styling) -->
+      <div class="md:w-5/12 bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-950 text-white p-7 sm:p-9 flex flex-col justify-between relative overflow-hidden">
+        <!-- Geometric Accent Layers (Inspired by reference specs) -->
+        <div class="absolute -top-12 -left-12 w-48 h-48 rounded-full bg-blue-600/20 blur-2xl pointer-events-none"></div>
+        <div class="absolute bottom-0 right-0 w-64 h-64 rounded-full bg-blue-500/15 blur-3xl pointer-events-none"></div>
 
-      <!-- PIN Masked Indicators -->
-      <div class="flex justify-center items-center space-x-3 my-6">
-        <div id="pin-dot-1" class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 transition-all duration-150"></div>
-        <div id="pin-dot-2" class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 transition-all duration-150"></div>
-        <div id="pin-dot-3" class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 transition-all duration-150"></div>
-        <div id="pin-dot-4" class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 transition-all duration-150"></div>
+        <div>
+          <!-- Logo & Brand Header -->
+          <div class="flex items-center space-x-3 mb-8">
+            <div class="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md flex items-center justify-center text-blue-200 shadow-inner">
+              <i data-lucide="scan-face" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <h2 class="font-bold text-lg tracking-wide text-white">FaceID Attendance</h2>
+              <p class="text-[11px] text-blue-200/80 uppercase tracking-widest font-semibold">Enterprise Kiosk OS</p>
+            </div>
+          </div>
+
+          <!-- Tab Switcher (Architectural Notched Styling) -->
+          <div class="space-y-3 mb-8">
+            <button type="button" id="tab-btn-login" onclick="switchAuthMode('login')" class="w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg">
+              <span class="flex items-center space-x-3">
+                <i data-lucide="log-in" class="w-4 h-4 text-blue-600"></i>
+                <span>LOGIN</span>
+              </span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-blue-600"></i>
+            </button>
+
+            <button type="button" id="tab-btn-signup" onclick="switchAuthMode('signup')" class="w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10">
+              <span class="flex items-center space-x-3">
+                <i data-lucide="user-plus" class="w-4 h-4 text-blue-300"></i>
+                <span>SIGN UP</span>
+              </span>
+              <span class="text-[10px] bg-blue-500/30 px-2 py-0.5 rounded-full text-blue-200">NEW</span>
+            </button>
+          </div>
+
+          <!-- Value-First Pillars (Behavioral Psychology) -->
+          <div class="space-y-3.5 text-xs text-blue-100/90 pt-2 border-t border-white/10">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-5 h-5 rounded-md bg-blue-500/20 flex items-center justify-center text-blue-300"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i></div>
+              <span>Multi-Tenant Data Isolation</span>
+            </div>
+            <div class="flex items-center space-x-2.5">
+              <div class="w-5 h-5 rounded-md bg-blue-500/20 flex items-center justify-center text-blue-300"><i data-lucide="smartphone" class="w-3.5 h-3.5"></i></div>
+              <span>Active Kiosk Fleet Synchronization</span>
+            </div>
+            <div class="flex items-center space-x-2.5">
+              <div class="w-5 h-5 rounded-md bg-blue-500/20 flex items-center justify-center text-blue-300"><i data-lucide="fingerprint" class="w-3.5 h-3.5"></i></div>
+              <span>Biometric Vector Cloud Registry</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-6 mt-6 border-t border-white/10 text-[11px] text-blue-200/70 flex items-center justify-between">
+          <span>Protected by Supabase Auth</span>
+          <span>v2.4 Production</span>
+        </div>
       </div>
 
-      <!-- Hidden Real Input for physical keyboard / typing -->
-      <input id="pin-input" type="password" maxlength="4" autofocus inputmode="numeric" class="opacity-0 absolute -z-10 top-0 left-0">
+      <!-- RIGHT FORM CONTENT PANEL (White / Deep Dark) -->
+      <div class="md:w-7/12 p-7 sm:p-10 flex flex-col justify-center text-slate-800 dark:text-gray-100 relative">
+        
+        <!-- Top Avatar Icon (Matching inspiration reference) -->
+        <div class="text-center mb-6">
+          <div class="w-16 h-16 mx-auto rounded-full bg-blue-50 dark:bg-blue-950/60 border-2 border-blue-600/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-md">
+            <i data-lucide="user" class="w-8 h-8"></i>
+          </div>
+        </div>
 
-      <div id="auth-error-msg" class="text-xs font-semibold text-red-500 hidden mb-4">
-        Incorrect PIN. Please try again.
+        <!-- Notification / Error Banner -->
+        <div id="auth-alert-box" class="hidden mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-center space-x-2 transition-all">
+          <i id="auth-alert-icon" data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+          <span id="auth-alert-text"></span>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- VIEW 1: LOGIN -->
+        <!-- ============================================== -->
+        <div id="auth-view-login" class="space-y-4">
+          <div class="text-center mb-5">
+            <h3 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white uppercase font-sans">Login</h3>
+            <p class="text-xs text-slate-500 dark:text-gray-400 mt-1">Enter your organization credentials</p>
+          </div>
+
+          <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-gray-300 mb-1.5">Email Address</label>
+              <div class="relative">
+                <i data-lucide="mail" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 dark:text-gray-500"></i>
+                <input id="login-email" type="email" required placeholder="admin@company.com" class="w-full bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all">
+              </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-xs font-semibold text-slate-600 dark:text-gray-300">Password</label>
+                <a href="javascript:void(0)" onclick="handleForgotPassword()" class="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline">Forgot Password?</a>
+              </div>
+              <div class="relative">
+                <i data-lucide="lock" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 dark:text-gray-500"></i>
+                <input id="login-password" type="password" required placeholder="••••••••" class="w-full bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700/80 rounded-xl pl-10 pr-10 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all">
+                <button type="button" onclick="togglePasswordVisibility('login-password', 'login-eye-icon')" class="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                  <i id="login-eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="pt-2">
+              <button type="submit" id="login-submit-btn" class="w-full py-3 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center space-x-2 active:scale-[0.99]">
+                <span>LOGIN</span>
+                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </form>
+
+          <div class="text-center pt-3 border-t border-gray-200 dark:border-gray-800">
+            <p class="text-xs text-slate-500 dark:text-gray-400">
+              Not a user? 
+              <button type="button" onclick="switchAuthMode('signup')" class="font-bold text-blue-600 dark:text-blue-400 hover:underline ml-1">Sign Up Here</button>
+            </p>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- VIEW 2: SIGN UP - STEP 1 (EMAIL ONLY) -->
+        <!-- ============================================== -->
+        <div id="auth-view-signup-1" class="space-y-4 hidden">
+          <!-- Goal Gradient Progress (25% initial momentum) -->
+          <div class="space-y-1.5 mb-3">
+            <div class="flex items-center justify-between text-[11px] font-bold">
+              <span class="text-blue-600 dark:text-blue-400">Step 1 of 3: Organization Identity</span>
+              <span class="text-slate-400 dark:text-gray-500">25% Complete</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-blue-600 h-full w-1/4 rounded-full transition-all duration-300"></div>
+            </div>
+          </div>
+
+          <div class="text-center mb-4">
+            <h3 class="text-xl font-extrabold text-slate-900 dark:text-white uppercase font-sans">Create Workspace</h3>
+            <p class="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Enter your email to receive an official verification code</p>
+          </div>
+
+          <form onsubmit="handleSignupStep1Submit(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-gray-300 mb-1.5">Work Email Address</label>
+              <div class="relative">
+                <i data-lucide="mail" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 dark:text-gray-500"></i>
+                <input id="signup-email" type="email" required placeholder="owner@company.com" class="w-full bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all">
+              </div>
+
+              <!-- Smart Defaults & Domain Quick Chips -->
+              <div class="flex items-center space-x-1.5 mt-2">
+                <span class="text-[10px] text-slate-400 dark:text-gray-500">Quick complete:</span>
+                <button type="button" onclick="appendDomain('@gmail.com')" class="px-2 py-0.5 text-[10px] rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 transition-colors">@gmail.com</button>
+                <button type="button" onclick="appendDomain('@outlook.com')" class="px-2 py-0.5 text-[10px] rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 transition-colors">@outlook.com</button>
+                <button type="button" onclick="appendDomain('@company.com')" class="px-2 py-0.5 text-[10px] rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 transition-colors">@company.com</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-gray-300 mb-1.5">Workspace / Company Name <span class="text-slate-400 font-normal">(Optional)</span></label>
+              <div class="relative">
+                <i data-lucide="building-2" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 dark:text-gray-500"></i>
+                <input id="signup-company" type="text" placeholder="e.g. Apex Technologies" class="w-full bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all">
+              </div>
+            </div>
+
+            <div class="pt-1">
+              <button type="submit" id="signup-1-btn" class="w-full py-3 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center space-x-2 active:scale-[0.99]">
+                <span>SEND VERIFICATION CODE</span>
+                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </form>
+
+          <div class="text-center pt-2 border-t border-gray-200 dark:border-gray-800">
+            <p class="text-xs text-slate-500 dark:text-gray-400">
+              Already have an account? 
+              <button type="button" onclick="switchAuthMode('login')" class="font-bold text-blue-600 dark:text-blue-400 hover:underline ml-1">Login</button>
+            </p>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- VIEW 3: SIGN UP - STEP 2 (6-DIGIT EMAIL OTP) -->
+        <!-- ============================================== -->
+        <div id="auth-view-signup-2" class="space-y-4 hidden">
+          <!-- Goal Gradient Progress (65% Endowed momentum) -->
+          <div class="space-y-1.5 mb-3">
+            <div class="flex items-center justify-between text-[11px] font-bold">
+              <span class="text-blue-600 dark:text-blue-400">Step 2 of 3: Verification Code</span>
+              <span class="text-slate-400 dark:text-gray-500">65% Complete</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-blue-600 h-full w-2/3 rounded-full transition-all duration-300"></div>
+            </div>
+          </div>
+
+          <div class="text-center mb-3">
+            <h3 class="text-xl font-extrabold text-slate-900 dark:text-white uppercase font-sans">Check Your Inbox</h3>
+            <p class="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
+              We sent a 6-digit code to <b id="otp-target-email" class="text-blue-600 dark:text-blue-400"></b>
+            </p>
+          </div>
+
+          <form onsubmit="handleSignupStep2Submit(event)" class="space-y-4">
+            <!-- 6-Digit OTP Box Grid -->
+            <div>
+              <div class="flex justify-center space-x-2 sm:space-x-3 my-2" id="otp-boxes-container">
+                <input type="text" maxlength="1" class="otp-box w-11 h-12 text-center text-lg font-bold bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30 text-slate-900 dark:text-white outline-none transition-all" data-idx="0">
+                <input type="text" maxlength="1" class="otp-box w-11 h-12 text-center text-lg font-bold bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30 text-slate-900 dark:text-white outline-none transition-all" data-idx="1">
+                <input type="text" maxlength="1" class="otp-box w-11 h-12 text-center text-lg font-bold bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30 text-slate-900 dark:text-white outline-none transition-all" data-idx="2">
+                <input type="text" maxlength="1" class="otp-box w-11 h-12 text-center text-lg font-bold bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30 text-slate-900 dark:text-white outline-none transition-all" data-idx="3">
+                <input type="text" maxlength="1" class="otp-box w-11 h-12 text-center text-lg font-bold bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30 text-slate-900 dark:text-white outline-none transition-all" data-idx="4">
+                <input type="text" maxlength="1" class="otp-box w-11 h-12 text-center text-lg font-bold bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30 text-slate-900 dark:text-white outline-none transition-all" data-idx="5">
+              </div>
+              <input type="hidden" id="signup-otp-combined" value="">
+            </div>
+
+            <!-- Resend Timer -->
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-gray-400 px-1">
+              <button type="button" onclick="goToSignupStep1()" class="text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1">
+                <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+                <span>Change Email</span>
+              </button>
+              <button type="button" id="btn-resend-otp" onclick="resendOtpCode()" class="hover:text-blue-600 dark:hover:text-blue-400 font-medium">
+                Resend in <span id="resend-countdown">30</span>s
+              </button>
+            </div>
+
+            <div class="pt-1">
+              <button type="submit" id="signup-2-btn" class="w-full py-3 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center space-x-2 active:scale-[0.99]">
+                <span>VERIFY OTP CODE</span>
+                <i data-lucide="check-circle" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- VIEW 4: SIGN UP - STEP 3 (PASSWORD & CAPTCHA) -->
+        <!-- ============================================== -->
+        <div id="auth-view-signup-3" class="space-y-4 hidden">
+          <!-- Goal Gradient Progress (90% Endowed momentum) -->
+          <div class="space-y-1.5 mb-3">
+            <div class="flex items-center justify-between text-[11px] font-bold">
+              <span class="text-blue-600 dark:text-blue-400">Step 3 of 3: Password & Security</span>
+              <span class="text-slate-400 dark:text-gray-500">90% Complete</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-blue-600 h-full w-[90%] rounded-full transition-all duration-300"></div>
+            </div>
+          </div>
+
+          <div class="text-center mb-3">
+            <h3 class="text-xl font-extrabold text-slate-900 dark:text-white uppercase font-sans">Set Password</h3>
+            <p class="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Secure your organization workspace credentials</p>
+          </div>
+
+          <form onsubmit="handleSignupStep3Submit(event)" class="space-y-3.5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-gray-300 mb-1">Create Password</label>
+              <div class="relative">
+                <i data-lucide="lock" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 dark:text-gray-500"></i>
+                <input id="signup-pass-1" type="password" required minlength="6" placeholder="Min. 6 characters" class="w-full bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700/80 rounded-xl pl-10 pr-10 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all">
+                <button type="button" onclick="togglePasswordVisibility('signup-pass-1', 'eye-pass-1')" class="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                  <i id="eye-pass-1" data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-gray-300 mb-1">Confirm Password</label>
+              <div class="relative">
+                <i data-lucide="shield-check" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 dark:text-gray-500"></i>
+                <input id="signup-pass-2" type="password" required minlength="6" placeholder="Re-type password" class="w-full bg-slate-50 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700/80 rounded-xl pl-10 pr-10 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all">
+                <button type="button" onclick="togglePasswordVisibility('signup-pass-2', 'eye-pass-2')" class="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                  <i id="eye-pass-2" data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Interactive Smart Captcha Widget (Human Verification) -->
+            <div class="pt-1">
+              <label class="block text-xs font-semibold text-slate-600 dark:text-gray-300 mb-1.5 flex items-center justify-between">
+                <span>Security Verification</span>
+                <span id="captcha-status" class="text-[10px] text-amber-500 font-bold">Slide to complete</span>
+              </label>
+              <div id="captcha-track" class="relative w-full h-11 bg-slate-100 dark:bg-[#151D2E] border border-gray-300 dark:border-gray-700 rounded-xl overflow-hidden flex items-center select-none cursor-pointer">
+                <div id="captcha-fill" class="absolute left-0 top-0 bottom-0 bg-blue-600/20 transition-all w-0"></div>
+                <div id="captcha-text" class="w-full text-center text-[11px] font-semibold text-slate-500 dark:text-gray-400 pointer-events-none transition-opacity">
+                  Slide right to verify human →
+                </div>
+                <div id="captcha-handle" class="absolute left-1 top-1 bottom-1 w-9 bg-blue-600 text-white rounded-lg flex items-center justify-center cursor-grab shadow-md transition-transform active:cursor-grabbing">
+                  <i id="captcha-icon" data-lucide="chevrons-right" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <input type="hidden" id="captcha-verified-val" value="false">
+            </div>
+
+            <div class="pt-2">
+              <button type="submit" id="signup-3-btn" class="w-full py-3 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center space-x-2 active:scale-[0.99]">
+                <span>ACTIVATE WORKSPACE & FINISH</span>
+                <i data-lucide="check" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+
       </div>
-
-      <!-- On-Screen Numeric Keypad for Mobile / Tablet -->
-      <div class="grid grid-cols-3 gap-2.5 max-w-[240px] mx-auto mb-4">
-        <button onclick="pressKey('1')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">1</button>
-        <button onclick="pressKey('2')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">2</button>
-        <button onclick="pressKey('3')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">3</button>
-        <button onclick="pressKey('4')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">4</button>
-        <button onclick="pressKey('5')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">5</button>
-        <button onclick="pressKey('6')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">6</button>
-        <button onclick="pressKey('7')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">7</button>
-        <button onclick="pressKey('8')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">8</button>
-        <button onclick="pressKey('9')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">9</button>
-        <button onclick="clearPin()" class="h-12 rounded-xl text-xs font-semibold bg-slate-200 hover:bg-slate-300 dark:bg-gray-800/50 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">CLR</button>
-        <button onclick="pressKey('0')" class="h-12 rounded-xl text-base font-bold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800/80 dark:hover:bg-gray-700 text-slate-800 dark:text-white border border-gray-200 dark:border-gray-700/60 transition-all active:scale-95">0</button>
-        <button onclick="backspacePin()" class="h-12 rounded-xl text-sm font-semibold bg-slate-200 hover:bg-slate-300 dark:bg-gray-800/50 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700/60 flex items-center justify-center transition-all active:scale-95">
-          <i data-lucide="delete" class="w-4 h-4"></i>
-        </button>
-      </div>
-
-      <p class="text-[11px] text-slate-400 dark:text-gray-500">Security PIN: <span class="font-mono">4409</span></p>
     </div>
   </div>
 
@@ -133,14 +405,26 @@
           </button>
         </div>
 
+        <!-- Active Kiosks Pill Badge -->
+        <button onclick="openKiosksModal()" id="active-kiosks-btn" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center space-x-2 hover:bg-emerald-500/20 transition-all" title="View Active Kiosks Fleet">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="active-kiosks-text">0 Kiosks Active</span>
+        </button>
+
+        <!-- User / Tenant Badge -->
+        <div id="user-profile-badge" class="hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+          <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+          <span id="tenant-display-name">Workspace</span>
+        </div>
+
         <!-- Light / Dark Theme Switcher Button -->
         <button id="theme-toggle-btn" onclick="toggleTheme()" class="p-2 rounded-xl text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white bg-slate-200/70 hover:bg-slate-300 dark:bg-gray-800/80 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-700/60 transition-all" title="Toggle Theme">
           <i id="theme-icon" data-lucide="sun" class="w-4 h-4 text-amber-500 dark:text-amber-400"></i>
         </button>
 
-        <!-- Lock Portal Button -->
-        <button onclick="lockPortal()" class="p-2 rounded-xl text-slate-600 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 bg-slate-200/70 hover:bg-slate-300 dark:bg-gray-800/80 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-700/60 transition-all" title="Lock Portal">
-          <i data-lucide="lock" class="w-4 h-4"></i>
+        <!-- Sign Out Button -->
+        <button onclick="handleUserLogout()" class="p-2 rounded-xl text-slate-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 bg-slate-200/70 hover:bg-red-500/10 dark:bg-gray-800/80 dark:hover:bg-red-500/20 border border-gray-300 dark:border-gray-700/60 transition-all" title="Sign Out of Workspace">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
         </button>
 
         <!-- Connection Status & Config Button -->
@@ -590,6 +874,38 @@ ALTER TABLE public.employees DISABLE ROW LEVEL SECURITY;</pre>
           <span>Open Supabase SQL Editor</span>
         </a>
         <button type="button" onclick="closeRlsFixModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Kiosks Fleet Modal -->
+  <div id="kiosks-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#141B26] border border-blue-500/30 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-blue-500/10 rounded-xl text-blue-600 dark:text-blue-400"><i data-lucide="smartphone" class="w-5 h-5"></i></div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Active Kiosks & Hardware</h3>
+            <p class="text-xs text-slate-500 dark:text-gray-400">Live terminals connected to your workspace</p>
+          </div>
+        </div>
+        <button onclick="closeKiosksModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1" id="kiosks-list-container">
+        <!-- Rendered dynamically via app.js -->
+        <div class="text-center py-8 text-xs text-slate-400 dark:text-gray-500">
+          <i data-lucide="loader-2" class="w-5 h-5 mx-auto mb-2 animate-spin"></i>
+          <span>Checking active kiosk terminals...</span>
+        </div>
+      </div>
+
+      <div class="mt-5 pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-xs text-slate-500 dark:text-gray-400">
+        <span class="flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Live WebSocket Heartbeat Active</span>
+        </span>
+        <button type="button" onclick="closeKiosksModal()" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 text-slate-700 dark:text-gray-300">Close</button>
       </div>
     </div>
   </div>

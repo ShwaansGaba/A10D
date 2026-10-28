@@ -47,6 +47,7 @@ dependencies:
   audioplayers: ^6.6.0
   flutter_tts: ^4.2.5
   connectivity_plus: ^7.3.1
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

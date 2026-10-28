@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/face_scanner_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/supabase_sync_service.dart';
 
 List<CameraDescription> _cameras = <CameraDescription>[];
@@ -15,7 +16,7 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Initialize Supabase realtime sync
+  // Initialize Supabase realtime sync & check session
   await SupabaseSyncService().initialize();
 
   try {
@@ -34,6 +35,8 @@ class FaceAttendanceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLoggedIn = SupabaseSyncService().isUserLoggedIn;
+
     return MaterialApp(
       title: 'Face Attendance',
       debugShowCheckedModeBanner: false,
@@ -41,9 +44,9 @@ class FaceAttendanceApp extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.black,
         colorScheme: const ColorScheme.dark(
-          primary: Colors.cyanAccent,
-          secondary: Colors.greenAccent,
-          surface: Color(0xFF161A20),
+          primary: Color(0xFF1D4ED8),
+          secondary: Colors.cyanAccent,
+          surface: Color(0xFF131D33),
         ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
@@ -51,7 +54,9 @@ class FaceAttendanceApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: FaceScannerScreen(cameras: cameras),
+      home: isLoggedIn
+          ? FaceScannerScreen(cameras: cameras)
+          : LoginScreen(cameras: cameras),
     );
   }
 }

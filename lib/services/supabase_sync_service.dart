@@ -65,6 +65,14 @@ class SupabaseSyncService {
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
+  // Supabase Auth State Helpers
+  bool get isUserLoggedIn =>
+      _isInitialized && Supabase.instance.client.auth.currentSession != null;
+  String? get currentUserId =>
+      Supabase.instance.client.auth.currentUser?.id;
+  String? get currentUserEmail =>
+      Supabase.instance.client.auth.currentUser?.email;
+
   // Single Punch Per Day: Employees who have punched in today
   final Set<String> _alreadyPunchedTodaySet = {};
 
@@ -76,6 +84,7 @@ class SupabaseSyncService {
   final ValueNotifier<bool> isNetworkConnected = ValueNotifier<bool>(true);
 
   Timer? _queueFlushTimer;
+  Timer? _kioskHeartbeatTimer;
   StreamSubscription? _connectivitySubscription;
   RealtimeChannel? _realtimeChannel;
 
@@ -112,22 +121,129 @@ class SupabaseSyncService {
 
       // Periodic queue flush & remote sync heartbeat (every 10s)
       _queueFlushTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-        if (isNetworkConnected.value) {
+        if (isNetworkConnected.value && isUserLoggedIn) {
           flushOfflineQueue();
           _syncTodayPunchesFromRemote();
           syncEmployeesFromRemote();
         }
       });
 
-      // Realtime live bidirectional sync with Supabase
-      _subscribeToRealtimeChanges();
-
-      // Sync Supabase online punches and employee profiles for today
-      await _syncTodayPunchesFromRemote();
-      await syncEmployeesFromRemote();
+      // If user is already logged in, register active kiosk and start heartbeats
+      if (isUserLoggedIn) {
+        await registerKioskOnline();
+        _subscribeToRealtimeChanges();
+        await _syncTodayPunchesFromRemote();
+        await syncEmployeesFromRemote();
+      }
     } catch (e) {
       debugPrint('Supabase initialization warning: $e');
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Kiosk Fleet Management & Heartbeat
+  // ------------------------------------------------------------------
+
+  Future<String> getDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? id = prefs.getString('kiosk_unique_device_id');
+    if (id == null) {
+      id = 'kiosk_${DateTime.now().millisecondsSinceEpoch}';
+      await prefs.setString('kiosk_unique_device_id', id);
+    }
+    return id;
+  }
+
+  Future<String> getDeviceName() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? name = prefs.getString('kiosk_custom_device_name');
+    if (name != null && name.isNotEmpty) return name;
+    return 'Android Terminal (Kiosk)';
+  }
+
+  Future<void> setDeviceName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('kiosk_custom_device_name', name.trim());
+    if (isUserLoggedIn) {
+      await registerKioskOnline();
+    }
+  }
+
+  Future<void> registerKioskOnline([String? customName]) async {
+    if (!_isInitialized || currentUserId == null) return;
+    try {
+      if (customName != null && customName.trim().isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('kiosk_custom_device_name', customName.trim());
+      }
+      final devId = await getDeviceId();
+      final devName = await getDeviceName();
+
+      await Supabase.instance.client.from('kiosks').upsert({
+        'user_id': currentUserId,
+        'device_id': devId,
+        'device_name': devName,
+        'platform': 'Android',
+        'is_active': true,
+        'last_heartbeat': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'user_id,device_id');
+
+      debugPrint('Kiosk registered active in cloud: $devName ($devId)');
+      _startKioskHeartbeat();
+    } catch (e) {
+      debugPrint('Error registering kiosk online (run MULTI_TENANT_SCHEMA.sql if kiosks table missing): $e');
+    }
+  }
+
+  void _startKioskHeartbeat() {
+    _kioskHeartbeatTimer?.cancel();
+    _kioskHeartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!_isInitialized || currentUserId == null) return;
+      try {
+        final devId = await getDeviceId();
+        await Supabase.instance.client
+            .from('kiosks')
+            .update({
+              'is_active': true,
+              'last_heartbeat': DateTime.now().toUtc().toIso8601String(),
+            })
+            .eq('user_id', currentUserId!)
+            .eq('device_id', devId);
+      } catch (e) {
+        debugPrint('Kiosk heartbeat update notice: $e');
+      }
+    });
+  }
+
+  Future<void> logout() async {
+    _kioskHeartbeatTimer?.cancel();
+    if (_isInitialized && currentUserId != null) {
+      try {
+        final devId = await getDeviceId();
+        await Supabase.instance.client
+            .from('kiosks')
+            .update({
+              'is_active': false,
+              'last_heartbeat': DateTime.now().toUtc().toIso8601String(),
+            })
+            .eq('user_id', currentUserId!)
+            .eq('device_id', devId);
+        debugPrint('Kiosk marked offline on server.');
+      } catch (e) {
+        debugPrint('Error marking kiosk offline: $e');
+      }
+    }
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {}
+    _alreadyPunchedTodaySet.clear();
+    _employeeUuidCache.clear();
+  }
+
+  void onUserLoggedIn() {
+    registerKioskOnline();
+    _subscribeToRealtimeChanges();
+    syncAllFromRemote();
   }
 
   void _subscribeToRealtimeChanges() {
@@ -190,10 +306,14 @@ class SupabaseSyncService {
       final now = DateTime.now();
       // True start of the local day represented in UTC ISO format
       final startOfDay = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
-      final res = await Supabase.instance.client
+      var query = Supabase.instance.client
           .from('attendance_logs')
           .select('employee_name')
           .gte('created_at', startOfDay);
+      if (currentUserId != null) {
+        query = query.eq('user_id', currentUserId!);
+      }
+      final res = await query;
 
       final remoteNamesToday = <String>{};
       for (final row in res) {
@@ -220,9 +340,13 @@ class SupabaseSyncService {
   Future<void> syncEmployeesFromRemote() async {
     if (!_isInitialized) return;
     try {
-      final res = await Supabase.instance.client
+      var query = Supabase.instance.client
           .from('employees')
           .select('id, name, embeddings, photo_url, created_at');
+      if (currentUserId != null) {
+        query = query.eq('user_id', currentUserId!);
+      }
+      final res = await query;
 
       final List<Map<String, dynamic>> employeeList =
           List<Map<String, dynamic>>.from(res);
@@ -268,14 +392,19 @@ class SupabaseSyncService {
         }
       }
 
+      final payload = <String, dynamic>{
+        'name': user.name,
+        'photo_url': photoDataUrl,
+        'embeddings': user.embeddings,
+        'created_at': user.registeredAt.toUtc().toIso8601String(),
+      };
+      if (currentUserId != null) {
+        payload['user_id'] = currentUserId;
+      }
+
       final res = await Supabase.instance.client
           .from('employees')
-          .upsert({
-            'name': user.name,
-            'photo_url': photoDataUrl,
-            'embeddings': user.embeddings,
-            'created_at': user.registeredAt.toUtc().toIso8601String(),
-          })
+          .upsert(payload)
           .select('id')
           .maybeSingle();
 
@@ -326,12 +455,13 @@ class SupabaseSyncService {
     }
 
     final now = DateTime.now();
+    final devName = await getDeviceName();
     final punchItem = OfflinePunchItem(
       id: '${now.millisecondsSinceEpoch}_$employeeName',
       employeeName: employeeName,
       employeeId: validUuid,
       confidence: (confidence * 100).round() / 100.0,
-      deviceId: 'Android Kiosk',
+      deviceId: devName,
       createdAt: now,
     );
 
@@ -346,6 +476,9 @@ class SupabaseSyncService {
           'device_id': punchItem.deviceId,
           'created_at': punchItem.createdAt.toUtc().toIso8601String(),
         };
+        if (currentUserId != null) {
+          insertData['user_id'] = currentUserId;
+        }
         if (punchItem.employeeId != null) {
           insertData['employee_id'] = punchItem.employeeId;
         }
@@ -409,6 +542,9 @@ class SupabaseSyncService {
           'device_id': punch.deviceId,
           'created_at': punch.createdAt.toUtc().toIso8601String(),
         };
+        if (currentUserId != null) {
+          insertData['user_id'] = currentUserId;
+        }
         if (punch.employeeId != null) {
           insertData['employee_id'] = punch.employeeId;
         }
@@ -447,34 +583,34 @@ class SupabaseSyncService {
 
     if (resetRemoteSupabase && _isInitialized) {
       try {
-        // Fetch and delete each attendance log by ID
-        final logs = await Supabase.instance.client.from('attendance_logs').select('id');
+        var query = Supabase.instance.client.from('attendance_logs').select('id');
+        if (currentUserId != null) query = query.eq('user_id', currentUserId!);
+        final logs = await query;
         for (final row in logs) {
           if (row['id'] != null) {
             await Supabase.instance.client.from('attendance_logs').delete().eq('id', row['id']);
           }
         }
-        await Supabase.instance.client
-            .from('attendance_logs')
-            .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (currentUserId != null) {
+          await Supabase.instance.client.from('attendance_logs').delete().eq('user_id', currentUserId!);
+        }
         debugPrint('Supabase attendance logs wiped successfully.');
       } catch (e) {
         debugPrint('Supabase attendance logs reset notice: $e');
       }
 
       try {
-        // Fetch and delete each employee by ID
-        final emps = await Supabase.instance.client.from('employees').select('id');
+        var query = Supabase.instance.client.from('employees').select('id');
+        if (currentUserId != null) query = query.eq('user_id', currentUserId!);
+        final emps = await query;
         for (final row in emps) {
           if (row['id'] != null) {
             await Supabase.instance.client.from('employees').delete().eq('id', row['id']);
           }
         }
-        await Supabase.instance.client
-            .from('employees')
-            .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (currentUserId != null) {
+          await Supabase.instance.client.from('employees').delete().eq('user_id', currentUserId!);
+        }
         debugPrint('Supabase employees wiped successfully.');
       } catch (e) {
         debugPrint('Supabase employees reset notice: $e');

@@ -3,11 +3,23 @@
 // Universal Cloud Biometrics & Web Kiosk Face Scanner
 // ==============================================================
 
-const ADMIN_PIN = '4409';
-let enteredPin = '';
+// ==============================================================
+// FaceID Attendance Dashboard - Application Logic
+// Multi-Tenant Royal Blue Architecture & Active Kiosk Fleet Hub
+// ==============================================================
+
 let supabaseClient = null;
+let currentAuthUser = null;
 let attendanceLogs = [];
 let employeesList = [];
+let activeKiosksList = [];
+
+// Multi-Step Sign-Up & Auth State
+let authMode = 'login'; // 'login' | 'signup'
+let signupStep = 1;     // 1: Email, 2: OTP, 3: Password & Captcha
+let pendingSignupEmail = '';
+let resendTimerInterval = null;
+let isCaptchaVerified = false;
 
 // Web Kiosk Scanner State
 let scannerStream = null;
@@ -24,7 +36,6 @@ let capturedEnrollEmbedding = null;
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
-  initAuth();
 
   // Set default summary date picker to today
   const summaryPicker = document.getElementById('summary-date-picker');
@@ -32,7 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
     summaryPicker.value = new Date().toISOString().slice(0, 10);
   }
 
+  initOtpBoxHandlers();
+  initCaptchaSlider();
   lucide.createIcons();
+
   initSupabase();
 });
 
@@ -67,98 +81,705 @@ function applyTheme(theme) {
 }
 
 // ==============================================================
-// PIN Authentication (PIN: 4409)
+// Multi-Tenant Supabase Authentication
 // ==============================================================
-function initAuth() {
-  const isAuth = sessionStorage.getItem('portal_auth') === 'true';
-  const overlay = document.getElementById('auth-overlay');
-  if (isAuth && overlay) {
-    overlay.classList.add('hidden');
-  } else if (overlay) {
-    overlay.classList.remove('hidden');
-    enteredPin = '';
-    updatePinDots();
+async function initAuth() {
+  if (!supabaseClient) return;
+
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session && session.user) {
+      handleAuthSuccess(session.user);
+    } else {
+      showAuthOverlay();
+    }
+  } catch (err) {
+    console.warn('Session check error:', err);
+    showAuthOverlay();
   }
 
-  // Keyboard typing listener
-  document.addEventListener('keydown', (e) => {
-    const overlay = document.getElementById('auth-overlay');
-    if (overlay && !overlay.classList.contains('hidden')) {
-      if (e.key >= '0' && e.key <= '9') {
-        pressKey(e.key);
-      } else if (e.key === 'Backspace') {
-        backspacePin();
-      } else if (e.key === 'Escape') {
-        clearPin();
-      }
+  // Realtime Auth State Change Listener
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    console.log('Supabase Auth State Event:', event);
+    if (session && session.user) {
+      handleAuthSuccess(session.user);
+    } else if (event === 'SIGNED_OUT') {
+      currentAuthUser = null;
+      showAuthOverlay();
     }
   });
 }
 
-function pressKey(digit) {
-  if (enteredPin.length < 4) {
-    enteredPin += digit;
-    updatePinDots();
-    if (enteredPin.length === 4) {
-      setTimeout(verifyPin, 100);
-    }
+function showAuthOverlay() {
+  const overlay = document.getElementById('auth-overlay');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    switchAuthMode('login');
   }
 }
 
-function backspacePin() {
-  if (enteredPin.length > 0) {
-    enteredPin = enteredPin.slice(0, -1);
-    updatePinDots();
+function hideAuthOverlay() {
+  const overlay = document.getElementById('auth-overlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
   }
 }
 
-function clearPin() {
-  enteredPin = '';
-  updatePinDots();
-}
+function handleAuthSuccess(user) {
+  currentAuthUser = user;
+  hideAuthOverlay();
 
-function updatePinDots() {
-  for (let i = 1; i <= 4; i++) {
-    const dot = document.getElementById(`pin-dot-${i}`);
-    if (!dot) continue;
-    if (i <= enteredPin.length) {
-      dot.className = 'w-4 h-4 rounded-full bg-cyan-500 dark:bg-cyan-400 border-2 border-cyan-500 dark:border-cyan-400 scale-110 transition-all duration-150 shadow-md shadow-cyan-400/50';
-    } else {
-      dot.className = 'w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 transition-all duration-150';
-    }
+  // Display user/workspace identifier in the header
+  const userBadge = document.getElementById('user-profile-badge');
+  const userText = document.getElementById('tenant-display-name');
+  if (userText) {
+    const email = user.email || 'Workspace';
+    userText.innerText = email.length > 22 ? email.slice(0, 20) + '...' : email;
   }
-  const errorMsg = document.getElementById('auth-error-msg');
-  if (errorMsg) errorMsg.classList.add('hidden');
+  if (userBadge) userBadge.classList.remove('hidden');
+
+  // Load tenant-isolated data
+  fetchEmployees();
+  fetchAttendanceLogs();
+  fetchActiveKiosks();
+  subscribeToUniversalRealtime();
 }
 
-function verifyPin() {
-  if (enteredPin === ADMIN_PIN) {
-    sessionStorage.setItem('portal_auth', 'true');
-    const overlay = document.getElementById('auth-overlay');
-    if (overlay) {
-      overlay.classList.add('opacity-0', 'transition-opacity', 'duration-300');
-      setTimeout(() => {
-        overlay.classList.add('hidden');
-        overlay.classList.remove('opacity-0');
-      }, 300);
-    }
+async function handleUserLogout() {
+  if (!confirm('Are you sure you want to sign out of this workspace?')) return;
+  if (!supabaseClient) return;
+
+  try {
+    stopWebScanner();
+    stopEnrollCamera();
+    await supabaseClient.auth.signOut();
+  } catch (err) {
+    console.warn('Logout notice:', err.message);
+  } finally {
+    currentAuthUser = null;
+    employeesList = [];
+    attendanceLogs = [];
+    activeKiosksList = [];
+    renderEmployees([]);
+    renderAttendanceLogs([]);
+    updateMetrics();
+    showAuthOverlay();
+  }
+}
+
+// Switch between LOGIN and SIGN UP modes
+function switchAuthMode(mode) {
+  authMode = mode;
+  hideAuthAlert();
+
+  const tabLogin = document.getElementById('tab-btn-login');
+  const tabSignup = document.getElementById('tab-btn-signup');
+  const viewLogin = document.getElementById('auth-view-login');
+  const viewSignup1 = document.getElementById('auth-view-signup-1');
+  const viewSignup2 = document.getElementById('auth-view-signup-2');
+  const viewSignup3 = document.getElementById('auth-view-signup-3');
+
+  if (mode === 'login') {
+    tabLogin.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg';
+    tabSignup.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10';
+
+    viewLogin.classList.remove('hidden');
+    viewSignup1.classList.add('hidden');
+    viewSignup2.classList.add('hidden');
+    viewSignup3.classList.add('hidden');
   } else {
-    const card = document.getElementById('auth-card');
-    const errorMsg = document.getElementById('auth-error-msg');
-    if (errorMsg) errorMsg.classList.remove('hidden');
-    if (card) {
-      card.classList.add('shake-anim');
-      setTimeout(() => card.classList.remove('shake-anim'), 400);
+    tabSignup.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg';
+    tabLogin.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10';
+
+    goToSignupStep(1);
+  }
+  lucide.createIcons();
+}
+
+function goToSignupStep(step) {
+  signupStep = step;
+  hideAuthAlert();
+
+  const viewLogin = document.getElementById('auth-view-login');
+  const viewSignup1 = document.getElementById('auth-view-signup-1');
+  const viewSignup2 = document.getElementById('auth-view-signup-2');
+  const viewSignup3 = document.getElementById('auth-view-signup-3');
+
+  viewLogin.classList.add('hidden');
+  viewSignup1.classList.add('hidden');
+  viewSignup2.classList.add('hidden');
+  viewSignup3.classList.add('hidden');
+
+  if (step === 1) {
+    viewSignup1.classList.remove('hidden');
+  } else if (step === 2) {
+    viewSignup2.classList.remove('hidden');
+    const emailDisp = document.getElementById('otp-target-email');
+    if (emailDisp) emailDisp.innerText = pendingSignupEmail;
+    clearOtpBoxes();
+    focusFirstOtpBox();
+    startResendCountdown();
+  } else if (step === 3) {
+    viewSignup3.classList.remove('hidden');
+    resetCaptchaSlider();
+  }
+  lucide.createIcons();
+}
+
+function goToSignupStep1() {
+  goToSignupStep(1);
+}
+
+// Smart Defaults: Domain Quick Append
+function appendDomain(domain) {
+  const input = document.getElementById('signup-email');
+  if (!input) return;
+  const current = input.value.trim();
+  if (!current) {
+    input.value = domain;
+  } else if (current.includes('@')) {
+    input.value = current.split('@')[0] + domain;
+  } else {
+    input.value = current + domain;
+  }
+  input.focus();
+}
+
+// Toggle password text visibility
+function togglePasswordVisibility(inputId, iconId) {
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (icon) icon.setAttribute('data-lucide', 'eye-off');
+  } else {
+    input.type = 'password';
+    if (icon) icon.setAttribute('data-lucide', 'eye');
+  }
+  lucide.createIcons();
+}
+
+// Alert banner inside auth card
+function showAuthAlert(msg, type = 'error') {
+  const box = document.getElementById('auth-alert-box');
+  const text = document.getElementById('auth-alert-text');
+  const icon = document.getElementById('auth-alert-icon');
+  if (!box || !text) return;
+
+  box.classList.remove('hidden');
+  text.innerText = msg;
+  if (type === 'success') {
+    box.className = 'mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-center space-x-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400';
+    if (icon) icon.setAttribute('data-lucide', 'check-circle-2');
+  } else {
+    box.className = 'mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-center space-x-2 bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400';
+    if (icon) icon.setAttribute('data-lucide', 'alert-circle');
+  }
+  lucide.createIcons();
+}
+
+function hideAuthAlert() {
+  const box = document.getElementById('auth-alert-box');
+  if (box) box.classList.add('hidden');
+}
+
+// ------------------------------------------------------------------
+// Auth Form Actions: Login & 3-Step Sign Up
+// ------------------------------------------------------------------
+
+// Login
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  hideAuthAlert();
+  if (!supabaseClient) {
+    showAuthAlert('Supabase connection is not initialized.');
+    return;
+  }
+
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-submit-btn');
+  const originalHtml = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Signing In...</span>';
+  lucide.createIcons();
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+    if (data && data.user) {
+      handleAuthSuccess(data.user);
     }
-    clearPin();
+  } catch (err) {
+    console.error('Login error:', err);
+    showAuthAlert(err.message || 'Invalid email or password. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    lucide.createIcons();
   }
 }
 
-function lockPortal() {
-  sessionStorage.removeItem('portal_auth');
-  stopWebScanner();
-  stopEnrollCamera();
-  initAuth();
+// Sign Up - Step 1: Submit Email for OTP
+async function handleSignupStep1Submit(e) {
+  e.preventDefault();
+  hideAuthAlert();
+  if (!supabaseClient) {
+    showAuthAlert('Supabase connection is not initialized.');
+    return;
+  }
+
+  const email = document.getElementById('signup-email').value.trim();
+  if (!email || !email.includes('@')) {
+    showAuthAlert('Please enter a valid work email address.');
+    return;
+  }
+
+  pendingSignupEmail = email;
+  const btn = document.getElementById('signup-1-btn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Sending Code...</span>';
+  lucide.createIcons();
+
+  try {
+    // Send 6-digit OTP code to the email using Supabase Auth signInWithOtp
+    const { data, error } = await supabaseClient.auth.signInWithOtp({
+      email: pendingSignupEmail,
+      options: {
+        shouldCreateUser: true,
+      }
+    });
+
+    if (error) throw error;
+    goToSignupStep(2);
+  } catch (err) {
+    console.error('OTP Send Error:', err);
+    showAuthAlert(err.message || 'Failed to dispatch verification code. Please check SMTP settings.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    lucide.createIcons();
+  }
+}
+
+// Sign Up - Step 2: Verify 6-Digit OTP
+async function handleSignupStep2Submit(e) {
+  e.preventDefault();
+  hideAuthAlert();
+  if (!supabaseClient) return;
+
+  const otp = getEnteredOtp();
+  if (otp.length < 6) {
+    showAuthAlert('Please enter the full 6-digit verification code.');
+    return;
+  }
+
+  const btn = document.getElementById('signup-2-btn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Verifying...</span>';
+  lucide.createIcons();
+
+  try {
+    const { data, error } = await supabaseClient.auth.verifyOtp({
+      email: pendingSignupEmail,
+      token: otp,
+      type: 'email',
+    });
+
+    if (error) throw error;
+    // OTP verified successfully; advance to password setup
+    goToSignupStep(3);
+  } catch (err) {
+    console.error('OTP Verify Error:', err);
+    showAuthAlert(err.message || 'Invalid or expired verification code. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    lucide.createIcons();
+  }
+}
+
+// Sign Up - Step 3: Set Password & Validate Captcha
+async function handleSignupStep3Submit(e) {
+  e.preventDefault();
+  hideAuthAlert();
+  if (!supabaseClient) return;
+
+  const pass1 = document.getElementById('signup-pass-1').value;
+  const pass2 = document.getElementById('signup-pass-2').value;
+
+  if (pass1.length < 6) {
+    showAuthAlert('Password must be at least 6 characters long.');
+    return;
+  }
+
+  if (pass1 !== pass2) {
+    showAuthAlert('Passwords do not match. Please re-type carefully.');
+    return;
+  }
+
+  if (!isCaptchaVerified) {
+    showAuthAlert('Please complete the slide verification challenge.');
+    return;
+  }
+
+  const btn = document.getElementById('signup-3-btn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Activating Workspace...</span>';
+  lucide.createIcons();
+
+  try {
+    // Set the user's permanent password
+    const { data, error } = await supabaseClient.auth.updateUser({
+      password: pass1,
+    });
+
+    if (error) throw error;
+
+    // Sign out to require clean login with credentials (as requested in specs)
+    await supabaseClient.auth.signOut();
+
+    // Return to login screen with prefilled email and celebration notification
+    switchAuthMode('login');
+    const loginEmailInput = document.getElementById('login-email');
+    if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
+    showAuthAlert('🎉 Workspace successfully registered and verified! Please log in with your password.', 'success');
+  } catch (err) {
+    console.error('Password Update Error:', err);
+    showAuthAlert(err.message || 'Failed to finalize account password. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    lucide.createIcons();
+  }
+}
+
+// Resend OTP Code
+async function resendOtpCode() {
+  if (!pendingSignupEmail || !supabaseClient) return;
+  const btn = document.getElementById('btn-resend-otp');
+  if (btn && btn.disabled) return;
+
+  try {
+    await supabaseClient.auth.signInWithOtp({
+      email: pendingSignupEmail,
+      options: { shouldCreateUser: true }
+    });
+    showAuthAlert('A fresh 6-digit code has been sent to your email.', 'success');
+    startResendCountdown();
+  } catch (err) {
+    showAuthAlert(err.message || 'Could not resend OTP code.');
+  }
+}
+
+function startResendCountdown() {
+  const btn = document.getElementById('btn-resend-otp');
+  const countdownEl = document.getElementById('resend-countdown');
+  if (!btn || !countdownEl) return;
+
+  clearInterval(resendTimerInterval);
+  let timeLeft = 30;
+  btn.disabled = true;
+  btn.classList.add('opacity-50', 'cursor-not-allowed');
+  countdownEl.innerText = timeLeft;
+
+  resendTimerInterval = setInterval(() => {
+    timeLeft--;
+    countdownEl.innerText = timeLeft;
+    if (timeLeft <= 0) {
+      clearInterval(resendTimerInterval);
+      btn.disabled = false;
+      btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      btn.innerHTML = 'Resend Code';
+    }
+  }, 1000);
+}
+
+// OTP Input Boxes Multi-Box Handler
+function initOtpBoxHandlers() {
+  const boxes = document.querySelectorAll('.otp-box');
+  boxes.forEach((box, index) => {
+    box.addEventListener('input', (e) => {
+      const val = e.target.value.replace(/[^0-9]/g, '');
+      e.target.value = val ? val[0] : '';
+      if (val && index < boxes.length - 1) {
+        boxes[index + 1].focus();
+      }
+    });
+
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !e.target.value && index > 0) {
+        boxes[index - 1].focus();
+      }
+    });
+
+    box.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
+      if (!pasteData) return;
+      for (let i = 0; i < boxes.length; i++) {
+        boxes[i].value = pasteData[i] || '';
+      }
+      const nextFocus = Math.min(pasteData.length, boxes.length - 1);
+      boxes[nextFocus].focus();
+    });
+  });
+}
+
+function getEnteredOtp() {
+  const boxes = document.querySelectorAll('.otp-box');
+  let code = '';
+  boxes.forEach((b) => (code += b.value));
+  return code;
+}
+
+function clearOtpBoxes() {
+  const boxes = document.querySelectorAll('.otp-box');
+  boxes.forEach((b) => (b.value = ''));
+}
+
+function focusFirstOtpBox() {
+  const first = document.querySelector('.otp-box[data-idx="0"]');
+  if (first) setTimeout(() => first.focus(), 150);
+}
+
+// ------------------------------------------------------------------
+// Interactive Smart Captcha Slider
+// ------------------------------------------------------------------
+function initCaptchaSlider() {
+  const track = document.getElementById('captcha-track');
+  const handle = document.getElementById('captcha-handle');
+  const fill = document.getElementById('captcha-fill');
+  const text = document.getElementById('captcha-text');
+  const status = document.getElementById('captcha-status');
+  if (!track || !handle) return;
+
+  let isDragging = false;
+  let startX = 0;
+
+  const onStart = (e) => {
+    if (isCaptchaVerified) return;
+    isDragging = true;
+    startX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    handle.style.transition = 'none';
+    fill.style.transition = 'none';
+  };
+
+  const onMove = (e) => {
+    if (!isDragging || isCaptchaVerified) return;
+    const currentX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    const deltaX = currentX - startX;
+    const maxTrack = track.clientWidth - handle.clientWidth - 8;
+    const clampedX = Math.max(0, Math.min(deltaX, maxTrack));
+
+    handle.style.transform = `translateX(${clampedX}px)`;
+    fill.style.width = `${clampedX + handle.clientWidth}px`;
+
+    // Verified threshold (90% traversed)
+    if (clampedX >= maxTrack * 0.92) {
+      completeCaptcha();
+    }
+  };
+
+  const onEnd = () => {
+    if (!isDragging || isCaptchaVerified) return;
+    isDragging = false;
+    handle.style.transition = 'transform 0.3s ease';
+    fill.style.transition = 'width 0.3s ease';
+    handle.style.transform = 'translateX(0px)';
+    fill.style.width = '0px';
+  };
+
+  handle.addEventListener('mousedown', onStart);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
+
+  handle.addEventListener('touchstart', onStart, { passive: true });
+  window.addEventListener('touchmove', onMove, { passive: true });
+  window.addEventListener('touchend', onEnd);
+}
+
+function completeCaptcha() {
+  isCaptchaVerified = true;
+  const handle = document.getElementById('captcha-handle');
+  const fill = document.getElementById('captcha-fill');
+  const text = document.getElementById('captcha-text');
+  const status = document.getElementById('captcha-status');
+  const icon = document.getElementById('captcha-icon');
+
+  if (handle) {
+    handle.className = 'absolute right-1 top-1 bottom-1 w-9 bg-emerald-500 text-white rounded-lg flex items-center justify-center cursor-default shadow-md';
+    handle.style.transform = 'none';
+  }
+  if (fill) {
+    fill.style.width = '100%';
+    fill.className = 'absolute left-0 top-0 bottom-0 bg-emerald-500/20';
+  }
+  if (text) {
+    text.innerText = '✓ Human Verification Complete';
+    text.className = 'w-full text-center text-[11px] font-bold text-emerald-600 dark:text-emerald-400';
+  }
+  if (status) {
+    status.innerText = '✓ Verified';
+    status.className = 'text-[10px] text-emerald-500 font-bold';
+  }
+  if (icon) icon.setAttribute('data-lucide', 'check');
+  lucide.createIcons();
+}
+
+function resetCaptchaSlider() {
+  isCaptchaVerified = false;
+  const handle = document.getElementById('captcha-handle');
+  const fill = document.getElementById('captcha-fill');
+  const text = document.getElementById('captcha-text');
+  const status = document.getElementById('captcha-status');
+  const icon = document.getElementById('captcha-icon');
+
+  if (handle) {
+    handle.className = 'absolute left-1 top-1 bottom-1 w-9 bg-blue-600 text-white rounded-lg flex items-center justify-center cursor-grab shadow-md';
+    handle.style.transform = 'translateX(0px)';
+  }
+  if (fill) {
+    fill.style.width = '0px';
+    fill.className = 'absolute left-0 top-0 bottom-0 bg-blue-600/20';
+  }
+  if (text) {
+    text.innerText = 'Slide right to verify human →';
+    text.className = 'w-full text-center text-[11px] font-semibold text-slate-500 dark:text-gray-400 pointer-events-none';
+  }
+  if (status) {
+    status.innerText = 'Slide to complete';
+    status.className = 'text-[10px] text-amber-500 font-bold';
+  }
+  if (icon) icon.setAttribute('data-lucide', 'chevrons-right');
+  lucide.createIcons();
+}
+
+async function handleForgotPassword() {
+  const email = prompt('Enter your registered email address to receive a password reset link:');
+  if (!email || !supabaseClient) return;
+
+  try {
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim());
+    if (error) throw error;
+    alert('Password reset link has been dispatched to: ' + email);
+  } catch (err) {
+    alert('Error sending reset link: ' + err.message);
+  }
+}
+
+// ------------------------------------------------------------------
+// Active Kiosks Fleet Management
+// ------------------------------------------------------------------
+async function fetchActiveKiosks() {
+  if (!supabaseClient || !currentAuthUser) return;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('kiosks')
+      .select('*')
+      .eq('user_id', currentAuthUser.id)
+      .order('last_heartbeat', { ascending: false });
+
+    if (error) {
+      console.warn('Kiosks table query notice (run MULTI_TENANT_SCHEMA.sql if table missing):', error.message);
+      return;
+    }
+
+    activeKiosksList = data || [];
+    renderActiveKiosks();
+  } catch (err) {
+    console.warn('Kiosks fetch notice:', err.message);
+  }
+}
+
+function renderActiveKiosks() {
+  const countBadge = document.getElementById('active-kiosks-text');
+  const listContainer = document.getElementById('kiosks-list-container');
+  if (!countBadge) return;
+
+  // A kiosk is active if is_active is true and heartbeat is within last 10 minutes
+  const now = new Date().getTime();
+  const activeKiosks = activeKiosksList.filter((k) => {
+    if (!k.is_active) return false;
+    const hbTime = new Date(k.last_heartbeat || k.created_at).getTime();
+    return (now - hbTime) < (10 * 60 * 1000); // 10 minutes tolerance
+  });
+
+  const activeCount = activeKiosks.length;
+  countBadge.innerText = `${activeCount} Kiosk${activeCount === 1 ? '' : 's'} Active`;
+
+  if (!listContainer) return;
+
+  if (activeKiosksList.length === 0) {
+    listContainer.innerHTML = `
+      <div class="text-center py-8 text-xs text-slate-400 dark:text-gray-500">
+        <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center mx-auto mb-3">
+          <i data-lucide="smartphone" class="w-6 h-6"></i>
+        </div>
+        <p class="font-semibold text-slate-700 dark:text-gray-300">No Kiosks Registered Yet</p>
+        <p class="text-[11px] mt-1 max-w-xs mx-auto">Open the FaceID Android app on your phone, log in with this account, and it will immediately appear here as an active kiosk.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  listContainer.innerHTML = activeKiosksList.map((k) => {
+    const hbTime = new Date(k.last_heartbeat || k.created_at).getTime();
+    const isOnline = k.is_active && (now - hbTime < (10 * 60 * 1000));
+    const timeFormatted = new Date(k.last_heartbeat || k.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    return `
+      <div class="p-3.5 rounded-xl border ${isOnline ? 'border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10' : 'border-gray-200 dark:border-gray-800 bg-slate-50 dark:bg-gray-900/50'} flex items-center justify-between transition-all">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl ${isOnline ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-gray-200 dark:bg-gray-800 text-gray-400'} flex items-center justify-center shrink-0">
+            <i data-lucide="${k.platform === 'Web' ? 'monitor' : 'smartphone'}" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="font-bold text-xs text-slate-900 dark:text-white flex items-center space-x-2">
+              <span>${escapeHtml(k.device_name || 'Kiosk Terminal')}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${isOnline ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-gray-200 dark:bg-gray-800 text-gray-500'}">
+                ${isOnline ? 'ONLINE' : 'OFFLINE'}
+              </span>
+            </div>
+            <div class="text-[11px] text-slate-500 dark:text-gray-400 mt-0.5 flex items-center space-x-2">
+              <span>Platform: ${escapeHtml(k.platform || 'Android')}</span>
+              <span>•</span>
+              <span>Last Heartbeat: ${timeFormatted}</span>
+            </div>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-[10px] font-mono text-slate-400 dark:text-gray-500">ID: ${escapeHtml((k.device_id || '').slice(0, 10))}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  lucide.createIcons();
+}
+
+function openKiosksModal() {
+  const modal = document.getElementById('kiosks-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    fetchActiveKiosks();
+  }
+  lucide.createIcons();
+}
+
+function closeKiosksModal() {
+  const modal = document.getElementById('kiosks-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 // ==============================================================
@@ -235,12 +856,8 @@ function initSupabase() {
     badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span><span>Connected</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
     lucide.createIcons();
 
-    // Fetch initial data
-    fetchEmployees();
-    fetchAttendanceLogs();
-
-    // Subscribe to Universal Realtime Streams for BOTH employees and attendance_logs
-    subscribeToUniversalRealtime();
+    // Initialize Auth Session Check
+    initAuth();
   } catch (err) {
     console.error('Failed to init Supabase:', err);
     badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30 flex items-center space-x-2 hover:bg-amber-500/20 transition-all cursor-pointer';
@@ -249,13 +866,18 @@ function initSupabase() {
   }
 }
 
-// Live Bidirectional Sync: Listen for changes on BOTH employees AND attendance_logs
+// Live Bidirectional Sync: Listen for changes on employees, attendance_logs AND kiosks
 function subscribeToUniversalRealtime() {
   if (!supabaseClient) return;
 
+  // Unsubscribe existing channel if any
+  try {
+    supabaseClient.removeChannel('realtime-universal-hub');
+  } catch (_) {}
+
   supabaseClient
     .channel('realtime-universal-hub')
-    // 1. Employees changes (instant update of Total Staff count and roster)
+    // 1. Employees changes
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'employees' },
@@ -264,7 +886,7 @@ function subscribeToUniversalRealtime() {
         await fetchEmployees();
       }
     )
-    // 2. Attendance punch changes (instant update of live stream, summary & metrics)
+    // 2. Attendance punch changes
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'attendance_logs' },
@@ -276,19 +898,32 @@ function subscribeToUniversalRealtime() {
         }
       }
     )
+    // 3. Kiosks status changes (live hardware fleet updates)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'kiosks' },
+      async (payload) => {
+        console.log('Realtime kiosks change detected:', payload.eventType);
+        await fetchActiveKiosks();
+      }
+    )
     .subscribe((status) => {
       console.log('Supabase Realtime Channel Status:', status);
     });
 }
+      console.log('Supabase Realtime Channel Status:', status);
+    });
+}
 
-// Fetch Employees from Supabase
+// Fetch Employees from Supabase (Scoped to Authenticated Tenant)
 async function fetchEmployees() {
   if (!supabaseClient) return;
   try {
-    const { data, error } = await supabaseClient
-      .from('employees')
-      .select('*')
-      .order('name', { ascending: true });
+    let query = supabaseClient.from('employees').select('*').order('name', { ascending: true });
+    if (currentAuthUser) {
+      query = query.eq('user_id', currentAuthUser.id);
+    }
+    const { data, error } = await query;
 
     if (error) throw error;
     employeesList = data || [];
@@ -300,15 +935,15 @@ async function fetchEmployees() {
   }
 }
 
-// Fetch Attendance Logs from Supabase
+// Fetch Attendance Logs from Supabase (Scoped to Authenticated Tenant)
 async function fetchAttendanceLogs() {
   if (!supabaseClient) return;
   try {
-    const { data, error } = await supabaseClient
-      .from('attendance_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(300);
+    let query = supabaseClient.from('attendance_logs').select('*').order('created_at', { ascending: false }).limit(300);
+    if (currentAuthUser) {
+      query = query.eq('user_id', currentAuthUser.id);
+    }
+    const { data, error } = await query;
 
     if (error) throw error;
     attendanceLogs = data || [];
@@ -881,6 +1516,7 @@ async function processWebScannerFrame() {
             confidence: highestScore,
             device_id: 'Web-Kiosk',
             photo_url: thumbDataUrl,
+            user_id: currentAuthUser ? currentAuthUser.id : null,
             created_at: new Date().toISOString()
           }])
           .select();
@@ -1135,6 +1771,7 @@ async function handleManualPunch(e) {
         punch_type: 'IN',
         confidence: 1.0,
         device_id: reason ? `Manual (${reason})` : 'Manual HR Correction',
+        user_id: currentAuthUser ? currentAuthUser.id : null,
         created_at: timestampIso
       }])
       .select();
@@ -1243,6 +1880,7 @@ async function handleCreateEmployee(e) {
       department: dept || 'General',
       photo_url: capturedEnrollPhoto || null,
       embeddings: capturedEnrollEmbedding || null,
+      user_id: currentAuthUser ? currentAuthUser.id : null,
     };
 
     const { data, error } = await supabaseClient
@@ -1307,10 +1945,10 @@ async function executeTotalReset() {
 
   try {
     if (supabaseClient) {
-      // 1. Fetch all attendance logs and delete
-      const { data: logsData } = await supabaseClient
-        .from('attendance_logs')
-        .select('id');
+      // 1. Fetch all attendance logs for this tenant and delete
+      let logsQuery = supabaseClient.from('attendance_logs').select('id');
+      if (currentAuthUser) logsQuery = logsQuery.eq('user_id', currentAuthUser.id);
+      const { data: logsData } = await logsQuery;
       
       if (logsData && logsData.length > 0) {
         const logIds = logsData.map(l => l.id);
@@ -1321,17 +1959,18 @@ async function executeTotalReset() {
           .select();
       }
 
-      // Also try direct neq delete
-      await supabaseClient
-        .from('attendance_logs')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000')
-        .select();
+      if (currentAuthUser) {
+        await supabaseClient
+          .from('attendance_logs')
+          .delete()
+          .eq('user_id', currentAuthUser.id)
+          .select();
+      }
 
-      // 2. Fetch all employees and delete
-      const { data: empsData } = await supabaseClient
-        .from('employees')
-        .select('id');
+      // 2. Fetch all employees for this tenant and delete
+      let empsQuery = supabaseClient.from('employees').select('id');
+      if (currentAuthUser) empsQuery = empsQuery.eq('user_id', currentAuthUser.id);
+      const { data: empsData } = await empsQuery;
       
       if (empsData && empsData.length > 0) {
         const empIds = empsData.map(e => e.id);
@@ -1342,14 +1981,23 @@ async function executeTotalReset() {
           .select();
       }
 
-      await supabaseClient
-        .from('employees')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000')
-        .select();
+      if (currentAuthUser) {
+        await supabaseClient
+          .from('employees')
+          .delete()
+          .eq('user_id', currentAuthUser.id)
+          .select();
+      }
 
       // 3. Verification check: Verify if the online server actually deleted them
-      const { data: checkLogs } = await supabaseClient.from('attendance_logs').select('id').limit(5);
+      let checkLogsQ = supabaseClient.from('attendance_logs').select('id').limit(5);
+      let checkEmpsQ = supabaseClient.from('employees').select('id').limit(5);
+      if (currentAuthUser) {
+        checkLogsQ = checkLogsQ.eq('user_id', currentAuthUser.id);
+        checkEmpsQ = checkEmpsQ.eq('user_id', currentAuthUser.id);
+      }
+      const { data: checkLogs } = await checkLogsQ;
+      const { data: checkEmps } = await checkEmpsQ;
       const { data: checkEmps } = await supabaseClient.from('employees').select('id').limit(5);
 
       if ((checkLogs && checkLogs.length > 0) || (checkEmps && checkEmps.length > 0)) {
