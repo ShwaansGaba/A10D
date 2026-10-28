@@ -422,10 +422,12 @@ async function handleSignupStep1Submit(e) {
 
   try {
     // Send 6-digit OTP code to the email using Supabase Auth signInWithOtp
+    const redirectUrl = window.location.origin ? (window.location.origin + window.location.pathname) : undefined;
     const { data, error } = await supabaseClient.auth.signInWithOtp({
       email: pendingSignupEmail,
       options: {
         shouldCreateUser: true,
+        emailRedirectTo: redirectUrl,
       }
     });
 
@@ -433,7 +435,11 @@ async function handleSignupStep1Submit(e) {
     goToSignupStep(2);
   } catch (err) {
     console.error('OTP Send Error:', err);
-    showAuthAlert(err.message || 'Failed to dispatch verification code. Please check SMTP settings.');
+    let msg = err.message || 'Failed to dispatch verification code.';
+    if (msg.includes('Error sending confirmation email')) {
+      msg = 'Supabase Email Dispatch Failed (500): Built-in email rate limit (3/hr) exceeded, or custom SMTP / template syntax needs setup in Supabase Dashboard.';
+    }
+    showAuthAlert(msg);
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
