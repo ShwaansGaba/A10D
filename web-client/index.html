@@ -363,6 +363,20 @@
             <span id="active-kiosks-text">0 Kiosks Active</span>
           </button>
 
+          <!-- Cloud Connection Status Badge -->
+          <button onclick="openConfigModal()" id="connection-badge" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/40 text-[#5D50A2] dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center space-x-1.5 hover:bg-purple-100 transition-all shrink-0 cursor-pointer" title="Supabase Cloud Connection">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="connection-status-text">Cloud Connected</span>
+            <i data-lucide="settings" class="w-3 h-3 ml-0.5 opacity-60"></i>
+          </button>
+
+          <!-- Hidden Metric Compatibility Anchors -->
+          <div class="hidden">
+            <span id="metric-total-employees">0</span>
+            <span id="metric-present-today">0</span>
+            <span id="metric-absent-today">0</span>
+          </div>
+
           <!-- Light / Dark Theme Switcher Button -->
           <button id="theme-toggle-btn" onclick="toggleTheme()" class="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-slate-100 dark:border-slate-700 transition-all shrink-0 cursor-pointer" title="Toggle Theme">
             <i id="theme-icon" data-lucide="sun" class="w-4 h-4 text-amber-500"></i>

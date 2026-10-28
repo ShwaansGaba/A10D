@@ -371,13 +371,17 @@ async function handleLoginSubmit(e) {
     return;
   }
 
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const btn = document.getElementById('login-submit-btn');
-  const originalHtml = btn.innerHTML;
+  const emailInput = document.getElementById('login-email');
+  const passwordInput = document.getElementById('login-password');
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passwordInput ? passwordInput.value : '';
+  const btn = document.getElementById('login-btn') || document.getElementById('login-submit-btn');
+  const originalHtml = btn ? btn.innerHTML : '<span>Sign In</span>';
 
-  btn.disabled = true;
-  btn.innerHTML = '<span>Signing In...</span>';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Signing In...</span>';
+  }
   safeCreateIcons();
 
   try {
@@ -394,8 +398,10 @@ async function handleLoginSubmit(e) {
     console.error('Login error:', err);
     showAuthAlert(err.message || 'Invalid email or password. Please try again.');
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     safeCreateIcons();
   }
 }
@@ -417,9 +423,11 @@ async function handleSignupStep1Submit(e) {
 
   pendingSignupEmail = email;
   const btn = document.getElementById('signup-1-btn');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span>Sending Code...</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Send Verification Code</span>';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Sending Code...</span>';
+  }
   safeCreateIcons();
 
   try {
@@ -443,8 +451,10 @@ async function handleSignupStep1Submit(e) {
     }
     showAuthAlert(msg);
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     safeCreateIcons();
   }
 }
@@ -462,9 +472,11 @@ async function handleSignupStep2Submit(e) {
   }
 
   const btn = document.getElementById('signup-2-btn');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span>Verifying Code...</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Verify Code</span>';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Verifying Code...</span>';
+  }
   safeCreateIcons();
 
   try {
@@ -497,8 +509,10 @@ async function handleSignupStep2Submit(e) {
     console.error('OTP Verify Error:', err);
     showAuthAlert(err.message || 'Invalid or expired verification code. Please check your email and try again.');
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     safeCreateIcons();
   }
 }
@@ -509,8 +523,10 @@ async function handleSignupStep3Submit(e) {
   hideAuthAlert();
   if (!supabaseClient) return;
 
-  const pass1 = document.getElementById('signup-pass-1').value;
-  const pass2 = document.getElementById('signup-pass-2').value;
+  const pass1Input = document.getElementById('signup-password') || document.getElementById('signup-pass-1');
+  const pass2Input = document.getElementById('signup-confirm-password') || document.getElementById('signup-pass-2');
+  const pass1 = pass1Input ? pass1Input.value : '';
+  const pass2 = pass2Input ? pass2Input.value : '';
 
   if (pass1.length < 6) {
     showAuthAlert('Password must be at least 6 characters long.');
@@ -529,9 +545,11 @@ async function handleSignupStep3Submit(e) {
   }
 
   const btn = document.getElementById('signup-3-btn');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span>Activating Workspace...</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Complete Setup</span>';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Activating Workspace...</span>';
+  }
   safeCreateIcons();
 
   try {
@@ -554,8 +572,10 @@ async function handleSignupStep3Submit(e) {
     console.error('Password Update Error:', err);
     showAuthAlert(err.message || 'Failed to finalize account password. Please try again.');
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     safeCreateIcons();
   }
 }
@@ -563,7 +583,7 @@ async function handleSignupStep3Submit(e) {
 // Resend OTP Code
 async function resendOtpCode() {
   if (!pendingSignupEmail || !supabaseClient) return;
-  const btn = document.getElementById('btn-resend-otp');
+  const btn = document.getElementById('resend-btn') || document.getElementById('btn-resend-otp');
   if (btn && btn.disabled) return;
 
   try {
@@ -579,24 +599,26 @@ async function resendOtpCode() {
 }
 
 function startResendCountdown() {
-  const btn = document.getElementById('btn-resend-otp');
-  const countdownEl = document.getElementById('resend-countdown');
+  const btn = document.getElementById('resend-btn') || document.getElementById('btn-resend-otp');
+  const countdownEl = document.getElementById('resend-timer-text') || document.getElementById('resend-countdown');
   if (!btn || !countdownEl) return;
 
   clearInterval(resendTimerInterval);
   let timeLeft = 30;
   btn.disabled = true;
   btn.classList.add('opacity-50', 'cursor-not-allowed');
-  countdownEl.innerText = timeLeft;
+  countdownEl.innerText = `(${timeLeft}s)`;
+  countdownEl.classList.remove('hidden');
 
   resendTimerInterval = setInterval(() => {
     timeLeft--;
-    countdownEl.innerText = timeLeft;
+    countdownEl.innerText = `(${timeLeft}s)`;
     if (timeLeft <= 0) {
       clearInterval(resendTimerInterval);
       btn.disabled = false;
       btn.classList.remove('opacity-50', 'cursor-not-allowed');
-      btn.innerHTML = 'Resend Code';
+      countdownEl.classList.add('hidden');
+      countdownEl.innerText = '';
     }
   }, 1000);
 }
@@ -1348,8 +1370,10 @@ function initSupabase() {
   const badge = document.getElementById('connection-badge');
 
   if (!url || !key) {
-    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/30 flex items-center space-x-2 hover:bg-red-500/20 transition-all cursor-pointer';
-    badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span><span>Configure Supabase</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+    if (badge) {
+      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/30 flex items-center space-x-2 hover:bg-red-500/20 transition-all cursor-pointer';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span><span>Configure Supabase</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+    }
     safeCreateIcons();
     renderSampleDemoData();
     return;
@@ -1358,16 +1382,20 @@ function initSupabase() {
   try {
     supabaseClient = window.supabase.createClient(url, key);
 
-    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 flex items-center space-x-2 hover:bg-green-500/20 transition-all cursor-pointer';
-    badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span><span>Connected</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+    if (badge) {
+      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 flex items-center space-x-2 hover:bg-green-500/20 transition-all cursor-pointer';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span><span>Connected</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+    }
     safeCreateIcons();
 
     // Initialize Auth Session Check
     initAuth();
   } catch (err) {
     console.error('Failed to init Supabase:', err);
-    badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30 flex items-center space-x-2 hover:bg-amber-500/20 transition-all cursor-pointer';
-    badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span>Connection Error</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+    if (badge) {
+      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30 flex items-center space-x-2 hover:bg-amber-500/20 transition-all cursor-pointer';
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span>Connection Error</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+    }
     safeCreateIcons();
   }
 }
