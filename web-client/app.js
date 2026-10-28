@@ -872,28 +872,125 @@ async function handleForgotPassword() {
 }
 
 // ------------------------------------------------------------------
-// Active Kiosks Fleet Management
+// Active Kiosks Fleet Management (Realtime Presence + Logs Aggregate)
 // ------------------------------------------------------------------
-async function fetchActiveKiosks() {
-  if (!supabaseClient || !currentAuthUser) return;
+let presenceFleetChannel = null;
+let realtimePresenceKiosks = [];
 
+function subscribeToPresenceFleet() {
+  if (!supabaseClient) return;
+  try {
+    if (presenceFleetChannel) {
+      presenceFleetChannel.unsubscribe();
+      presenceFleetChannel = null;
+    }
+
+    presenceFleetChannel = supabaseClient.channel('kiosk-fleet-presence');
+    presenceFleetChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceFleetChannel.presenceState();
+        handlePresenceStateChange(state);
+      })
+      .on('presence', { event: 'join' }, () => {
+        const state = presenceFleetChannel.presenceState();
+        handlePresenceStateChange(state);
+      })
+      .on('presence', { event: 'leave' }, () => {
+        const state = presenceFleetChannel.presenceState();
+        handlePresenceStateChange(state);
+      })
+      .subscribe(async (status) => {
+        console.log('Kiosk Fleet Presence Channel Status:', status);
+        if (status === 'SUBSCRIBED') {
+          try {
+            await presenceFleetChannel.track({
+              device_id: 'web_dashboard_' + (currentAuthUser ? currentAuthUser.id.slice(0, 8) : 'admin'),
+              device_name: 'Web Admin Dashboard',
+              platform: 'Web',
+              status: 'ONLINE',
+              online_at: new Date().toISOString(),
+            });
+          } catch (_) {}
+        }
+      });
+  } catch (err) {
+    console.warn('Presence fleet init notice:', err);
+  }
+}
+
+function handlePresenceStateChange(state) {
+  const list = [];
+  for (const key in state) {
+    const presences = state[key];
+    if (Array.isArray(presences)) {
+      for (const p of presences) {
+        if (p && p.device_id) {
+          list.push({
+            device_id: p.device_id,
+            device_name: p.device_name || 'Terminal',
+            platform: p.platform || 'Android Phone',
+            is_active: true,
+            last_heartbeat: p.online_at || new Date().toISOString(),
+            is_presence_online: true,
+          });
+        }
+      }
+    }
+  }
+  realtimePresenceKiosks = list;
+  fetchActiveKiosks();
+}
+
+async function fetchActiveKiosks() {
+  if (!supabaseClient) return;
+
+  let tableKiosks = [];
   try {
     const { data, error } = await supabaseClient
       .from('kiosks')
       .select('*')
-      .eq('user_id', currentAuthUser.id)
       .order('last_heartbeat', { ascending: false });
 
-    if (error) {
-      console.warn('Kiosks table query notice (run MULTI_TENANT_SCHEMA.sql if table missing):', error.message);
-      return;
+    if (!error && Array.isArray(data)) {
+      tableKiosks = data;
     }
+  } catch (_) {}
 
-    activeKiosksList = data || [];
-    renderActiveKiosks();
-  } catch (err) {
-    console.warn('Kiosks fetch notice:', err.message);
+  // Aggregate with recent devices from attendance_logs
+  const recentLogsKiosks = [];
+  if (Array.isArray(attendanceLogs)) {
+    const seenDevs = new Set();
+    const now = Date.now();
+    for (const log of attendanceLogs) {
+      if (log.device_id && !seenDevs.has(log.device_id)) {
+        seenDevs.add(log.device_id);
+        const logTime = new Date(log.created_at).getTime();
+        const isRecent = (now - logTime) < (24 * 60 * 60 * 1000); // 24 hours
+        recentLogsKiosks.push({
+          device_id: log.device_id,
+          device_name: log.device_id.startsWith('kiosk_') ? 'Android Terminal (Kiosk)' : log.device_id,
+          platform: log.device_id.toLowerCase().includes('web') ? 'Web' : 'Android Phone',
+          is_active: isRecent,
+          last_heartbeat: log.created_at,
+        });
+      }
+    }
   }
+
+  // Merge sources: Realtime Presence > Table Kiosks > Recent Logs Kiosks
+  const map = new Map();
+  for (const k of recentLogsKiosks) {
+    map.set(k.device_id, k);
+  }
+  for (const k of tableKiosks) {
+    map.set(k.device_id, k);
+  }
+  for (const k of realtimePresenceKiosks) {
+    map.set(k.device_id, k);
+  }
+
+  activeKiosksList = Array.from(map.values());
+  renderActiveKiosks();
 }
 
 function renderActiveKiosks() {
@@ -901,12 +998,13 @@ function renderActiveKiosks() {
   const listContainer = document.getElementById('kiosks-list-container');
   if (!countBadge) return;
 
-  // A kiosk is active if is_active is true and heartbeat is within last 10 minutes
-  const now = new Date().getTime();
+  const now = Date.now();
+  // Kiosk is active if presence is online OR heartbeat within last 15 minutes
   const activeKiosks = activeKiosksList.filter((k) => {
-    if (!k.is_active) return false;
-    const hbTime = new Date(k.last_heartbeat || k.created_at).getTime();
-    return (now - hbTime) < (10 * 60 * 1000); // 10 minutes tolerance
+    if (k.is_presence_online) return true;
+    if (k.is_active === false) return false;
+    const hbTime = new Date(k.last_heartbeat || k.created_at || 0).getTime();
+    return (now - hbTime) < (15 * 60 * 1000);
   });
 
   const activeCount = activeKiosks.length;
@@ -921,7 +1019,7 @@ function renderActiveKiosks() {
           <i data-lucide="smartphone" class="w-6 h-6"></i>
         </div>
         <p class="font-semibold text-slate-700 dark:text-gray-300">No Kiosks Registered Yet</p>
-        <p class="text-[11px] mt-1 max-w-xs mx-auto">Open the FaceID Android app on your phone, log in with this account, and it will immediately appear here as an active kiosk.</p>
+        <p class="text-[11px] mt-1 max-w-xs mx-auto">Open the FaceID Android app on your phone, and it will immediately appear here live as an active kiosk.</p>
       </div>
     `;
     safeCreateIcons();
@@ -929,9 +1027,8 @@ function renderActiveKiosks() {
   }
 
   listContainer.innerHTML = activeKiosksList.map((k) => {
-    const hbTime = new Date(k.last_heartbeat || k.created_at).getTime();
-    const isOnline = k.is_active && (now - hbTime < (10 * 60 * 1000));
-    const timeFormatted = new Date(k.last_heartbeat || k.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const isOnline = k.is_presence_online || (k.is_active && (now - new Date(k.last_heartbeat || 0).getTime() < (15 * 60 * 1000)));
+    const timeFormatted = k.last_heartbeat ? new Date(k.last_heartbeat).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Live Now';
 
     return `
       <div class="p-3.5 rounded-xl border ${isOnline ? 'border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10' : 'border-gray-200 dark:border-gray-800 bg-slate-50 dark:bg-gray-900/50'} flex items-center justify-between transition-all">
@@ -947,14 +1044,14 @@ function renderActiveKiosks() {
               </span>
             </div>
             <div class="text-[11px] text-slate-500 dark:text-gray-400 mt-0.5 flex items-center space-x-2">
-              <span>Platform: ${escapeHtml(k.platform || 'Android')}</span>
+              <span>Platform: ${escapeHtml(k.platform || 'Android Phone')}</span>
               <span>•</span>
-              <span>Last Heartbeat: ${timeFormatted}</span>
+              <span>${isOnline ? 'Active Now' : 'Last Seen: ' + timeFormatted}</span>
             </div>
           </div>
         </div>
         <div class="text-right">
-          <span class="text-[10px] font-mono text-slate-400 dark:text-gray-500">ID: ${escapeHtml((k.device_id || '').slice(0, 10))}</span>
+          <span class="text-[10px] font-mono text-slate-400 dark:text-gray-500">ID: ${escapeHtml((k.device_id || '').slice(0, 14))}</span>
         </div>
       </div>
     `;
@@ -1503,9 +1600,12 @@ function initSupabase() {
   }
 }
 
-// Live Bidirectional Sync: Listen for changes on employees, attendance_logs AND kiosks
+// Live Bidirectional Sync: Listen for changes on employees and attendance_logs + Realtime Presence
 function subscribeToUniversalRealtime() {
   if (!supabaseClient) return;
+
+  // Subscribe to live Realtime Presence Fleet for hardware kiosks & phones
+  subscribeToPresenceFleet();
 
   // Unsubscribe existing channel if any
   try {
@@ -1535,36 +1635,19 @@ function subscribeToUniversalRealtime() {
         }
       }
     )
-    // 3. Kiosks status changes (live hardware fleet updates)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'kiosks' },
-      async (payload) => {
-        console.log('Realtime kiosks change detected:', payload.eventType);
-        await fetchActiveKiosks();
-      }
-    )
     .subscribe((status) => {
       console.log('Supabase Realtime Channel Status:', status);
     });
 }
 
-// Fetch Employees from Supabase (Scoped to Authenticated Tenant)
+// Fetch Employees from Supabase
 async function fetchEmployees() {
   if (!supabaseClient) return;
   try {
-    let query = supabaseClient.from('employees').select('*').order('name', { ascending: true });
-    if (currentAuthUser) {
-      query = query.eq('user_id', currentAuthUser.id);
-    }
-    let { data, error } = await query;
-
-    if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
-      console.warn('user_id column missing in employees schema cache, falling back to unfiltered...');
-      const fallback = await supabaseClient.from('employees').select('*').order('name', { ascending: true });
-      data = fallback.data;
-      error = fallback.error;
-    }
+    const { data, error } = await supabaseClient
+      .from('employees')
+      .select('*')
+      .order('name', { ascending: true });
 
     if (error) throw error;
     employeesList = data || [];
@@ -1576,28 +1659,23 @@ async function fetchEmployees() {
   }
 }
 
-// Fetch Attendance Logs from Supabase (Scoped to Authenticated Tenant)
+// Fetch Attendance Logs from Supabase
 async function fetchAttendanceLogs() {
   if (!supabaseClient) return;
   try {
-    let query = supabaseClient.from('attendance_logs').select('*').order('created_at', { ascending: false }).limit(300);
-    if (currentAuthUser) {
-      query = query.eq('user_id', currentAuthUser.id);
-    }
-    let { data, error } = await query;
-
-    if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
-      console.warn('user_id column missing in attendance_logs schema cache, falling back to unfiltered...');
-      const fallback = await supabaseClient.from('attendance_logs').select('*').order('created_at', { ascending: false }).limit(300);
-      data = fallback.data;
-      error = fallback.error;
-    }
+    const { data, error } = await supabaseClient
+      .from('attendance_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(300);
 
     if (error) throw error;
     attendanceLogs = data || [];
     renderAttendanceLogs(attendanceLogs);
     updateMetrics();
     renderSummaryView();
+    // Update active kiosks based on recent punch device IDs
+    fetchActiveKiosks();
   } catch (e) {
     console.warn('Attendance logs fetch notice:', e.message);
   }
@@ -2172,7 +2250,6 @@ async function processWebScannerFrame() {
           confidence: highestScore,
           device_id: 'Web-Kiosk',
           photo_url: thumbDataUrl,
-          user_id: currentAuthUser ? currentAuthUser.id : null,
           created_at: new Date().toISOString()
         };
 
@@ -2180,16 +2257,6 @@ async function processWebScannerFrame() {
           .from('attendance_logs')
           .insert([punchRecord])
           .select();
-
-        if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
-          delete punchRecord.user_id;
-          const retry = await supabaseClient
-            .from('attendance_logs')
-            .insert([punchRecord])
-            .select();
-          data = retry.data;
-          error = retry.error;
-        }
 
         if (!error && data && data[0]) {
           attendanceLogs.unshift(data[0]);
@@ -2439,7 +2506,6 @@ async function handleManualPunch(e) {
       punch_type: 'IN',
       confidence: 1.0,
       device_id: reason ? `Manual (${reason})` : 'Manual HR Correction',
-      user_id: currentAuthUser ? currentAuthUser.id : null,
       created_at: timestampIso
     };
 
@@ -2447,16 +2513,6 @@ async function handleManualPunch(e) {
       .from('attendance_logs')
       .insert([punchPayload])
       .select();
-
-    if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
-      delete punchPayload.user_id;
-      const retry = await supabaseClient
-        .from('attendance_logs')
-        .insert([punchPayload])
-        .select();
-      data = retry.data;
-      error = retry.error;
-    }
 
     if (error) throw error;
 
@@ -2562,24 +2618,13 @@ async function handleCreateEmployee(e) {
       department: dept || 'General',
       photo_url: capturedEnrollPhoto || null,
       embeddings: capturedEnrollEmbedding || null,
-      user_id: currentAuthUser ? currentAuthUser.id : null,
+      is_active: true,
     };
 
     let { data, error } = await supabaseClient
       .from('employees')
       .insert([newRecord])
       .select();
-
-    if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
-      console.warn('user_id column missing in schema cache, retrying without user_id...');
-      delete newRecord.user_id;
-      const retry = await supabaseClient
-        .from('employees')
-        .insert([newRecord])
-        .select();
-      data = retry.data;
-      error = retry.error;
-    }
 
     if (error) throw error;
     closeAddEmployeeModal();
@@ -2638,59 +2683,31 @@ async function executeTotalReset() {
 
   try {
     if (supabaseClient) {
-      // 1. Fetch all attendance logs for this tenant and delete
-      let logsQuery = supabaseClient.from('attendance_logs').select('id');
-      if (currentAuthUser) logsQuery = logsQuery.eq('user_id', currentAuthUser.id);
-      const { data: logsData } = await logsQuery;
+      // 1. Fetch all attendance logs and delete by ID
+      const { data: logsData } = await supabaseClient.from('attendance_logs').select('id');
       
       if (logsData && logsData.length > 0) {
         const logIds = logsData.map(l => l.id);
         await supabaseClient
           .from('attendance_logs')
           .delete()
-          .in('id', logIds)
-          .select();
+          .in('id', logIds);
       }
 
-      if (currentAuthUser) {
-        await supabaseClient
-          .from('attendance_logs')
-          .delete()
-          .eq('user_id', currentAuthUser.id)
-          .select();
-      }
-
-      // 2. Fetch all employees for this tenant and delete
-      let empsQuery = supabaseClient.from('employees').select('id');
-      if (currentAuthUser) empsQuery = empsQuery.eq('user_id', currentAuthUser.id);
-      const { data: empsData } = await empsQuery;
+      // 2. Fetch all employees and delete by ID
+      const { data: empsData } = await supabaseClient.from('employees').select('id');
       
       if (empsData && empsData.length > 0) {
         const empIds = empsData.map(e => e.id);
         await supabaseClient
           .from('employees')
           .delete()
-          .in('id', empIds)
-          .select();
-      }
-
-      if (currentAuthUser) {
-        await supabaseClient
-          .from('employees')
-          .delete()
-          .eq('user_id', currentAuthUser.id)
-          .select();
+          .in('id', empIds);
       }
 
       // 3. Verification check: Verify if the online server actually deleted them
-      let checkLogsQ = supabaseClient.from('attendance_logs').select('id').limit(5);
-      let checkEmpsQ = supabaseClient.from('employees').select('id').limit(5);
-      if (currentAuthUser) {
-        checkLogsQ = checkLogsQ.eq('user_id', currentAuthUser.id);
-        checkEmpsQ = checkEmpsQ.eq('user_id', currentAuthUser.id);
-      }
-      const { data: checkLogs } = await checkLogsQ;
-      const { data: checkEmps } = await checkEmpsQ;
+      const { data: checkLogs } = await supabaseClient.from('attendance_logs').select('id').limit(5);
+      const { data: checkEmps } = await supabaseClient.from('employees').select('id').limit(5);
 
       if ((checkLogs && checkLogs.length > 0) || (checkEmps && checkEmps.length > 0)) {
         console.warn('Supabase RLS prevented deletion. Records still present on server.');

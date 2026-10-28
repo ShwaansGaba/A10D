@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/registered_user.dart';
+import 'supabase_sync_service.dart';
 
 class LivenessSample {
   final double leftEye;
@@ -176,15 +177,19 @@ class FaceRecognitionService {
     debugPrint('FaceRecognitionService: All local face data wiped.');
   }
 
-  /// Live-sync local face cache with remote employees from Supabase
+  /// Live-sync local face cache with remote employees from Supabase (True Bidirectional)
   Future<void> syncFromRemoteEmployees(List<Map<String, dynamic>> remoteEmployees) async {
     final prefs = await SharedPreferences.getInstance();
     final localUsers = await getRegisteredUsers();
 
+    // 1. If remoteEmployees is empty:
+    // NEVER wipe local face data! If localUsers has profiles, push them up to Supabase!
     if (remoteEmployees.isEmpty) {
       if (localUsers.isNotEmpty) {
-        debugPrint('Remote employee list is empty. Clearing all local face data.');
-        await resetAllFaceData();
+        debugPrint('Remote employee list is empty. Pushing ${localUsers.length} local profiles to Supabase...');
+        for (final user in localUsers) {
+          SupabaseSyncService().syncEmployee(user);
+        }
       }
       return;
     }
@@ -198,25 +203,20 @@ class FaceRecognitionService {
         .whereType<String>()
         .toSet();
 
-    // 1. Remove any local users who no longer exist on remote
+    // 2. Ensure all local users are preserved. If any local user is missing from remote, push to remote!
     final updatedList = <RegisteredUser>[];
     for (final user in localUsers) {
       final matchesName = remoteNames.contains(user.name.trim().toLowerCase());
       final matchesId = remoteIds.contains(user.id);
-      if (matchesName || matchesId) {
-        updatedList.add(user);
-      } else {
-        debugPrint('Removing locally cached face for removed employee: ${user.name}');
-        try {
-          final file = File(user.photoPath);
-          if (await file.exists()) {
-            await file.delete();
-          }
-        } catch (_) {}
+      updatedList.add(user);
+
+      if (!matchesName && !matchesId) {
+        debugPrint('Local employee ${user.name} not found on Supabase. Syncing up to cloud...');
+        SupabaseSyncService().syncEmployee(user);
       }
     }
 
-    // 2. Add any remote employees that have embeddings and are missing locally
+    // 3. Import any remote employees that have embeddings and are not yet in local cache
     for (final emp in remoteEmployees) {
       final name = emp['name'] as String?;
       if (name == null || name.trim().isEmpty) continue;
@@ -270,7 +270,7 @@ class FaceRecognitionService {
     }
 
     await prefs.setStringList(_usersKey, updatedList.map((u) => u.toJson()).toList());
-    debugPrint('FaceRecognitionService: Local face database now has ${updatedList.length} enrolled users.');
+    debugPrint('FaceRecognitionService: Local face database reconciled with ${updatedList.length} enrolled users.');
   }
 
   /// High-speed biometric embedding extraction

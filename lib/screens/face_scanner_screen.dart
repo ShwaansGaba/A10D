@@ -288,96 +288,19 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
     if (!mounted) return;
 
-    await Navigator.of(context).push(
+    final registeredUser = await Navigator.of(context).push<RegisteredUser?>(
       MaterialPageRoute(
         builder: (ctx) => RegisterFaceScreen(cameras: widget.cameras),
       ),
     );
+    if (registeredUser != null) {
+      await SupabaseSyncService().syncEmployee(registeredUser);
+    }
     await SupabaseSyncService().syncAllFromRemote();
 
     await FaceRecognitionService().cleanCache();
     if (mounted) {
       await _initializeCamera();
-    }
-  }
-
-  /// Direct Full System Reset with Safety Confirmation
-  Future<void> _promptAdminReset() async {
-    _wakeKiosk();
-    if (!mounted) return;
-
-    // Safety confirmation dialog
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1417),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-              SizedBox(width: 8),
-              Text('Reset Everything?', style: TextStyle(color: Colors.white, fontSize: 18)),
-            ],
-          ),
-          content: const Text(
-            'This action will permanently delete:\n\n'
-            '• All registered employee facial profiles & embeddings\n'
-            '• All attendance logs & punches (locally & on Supabase)\n'
-            '• Offline queued punches & today\'s punch tracking\n\n'
-            'Are you sure you want to completely reset?',
-            style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Yes, Reset All', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirm != true || !mounted) return;
-
-    // Perform complete reset
-    try {
-      await FaceRecognitionService().resetAllFaceData();
-      await SupabaseSyncService().resetAllAttendanceData(resetRemoteSupabase: true);
-
-      if (mounted) {
-        setState(() {
-          _recognizedUser = null;
-          _lastPunchStatus = null;
-          _isLivenessPassed = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('All facial data and attendance records have been reset.'),
-            backgroundColor: Colors.redAccent,
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Reset encountered an issue: $e'),
-            backgroundColor: Colors.amber,
-          ),
-        );
-      }
     }
   }
 
@@ -741,36 +664,6 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
                       ),
                     ),
                   ],
-                ),
-              ),
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                  color: !isOnline
-                                      ? Colors.redAccent
-                                      : (count > 0 ? Colors.amberAccent : Colors.greenAccent),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                !isOnline
-                                    ? (count > 0 ? 'Offline ($count queued)' : 'Offline')
-                                    : (count > 0 ? 'Syncing ($count)' : 'Online'),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
                 ),
               ),
 
