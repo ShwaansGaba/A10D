@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FaceID Attendance | HR & Admin Portal</title>
+  <title>FaceID Attendance | Fleet & Admin Portal</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
@@ -16,13 +16,15 @@
       theme: {
         extend: {
           colors: {
-            brand: {
-              cyan: '#18FFFF',
-              green: '#00E676',
-              dark: '#0A0E14',
-              surface: '#121720',
-              card: '#181F2C',
-              border: 'rgba(255, 255, 255, 0.08)'
+            theme: {
+              purple: '#5D50A2',
+              purpleLight: '#6B5FB5',
+              purpleDark: '#4A3E8A',
+              pink: '#FF5C7E',
+              pinkDark: '#E64769',
+              canvas: '#E5E9F2',
+              card: '#FFFFFF',
+              darkCard: '#151B28'
             }
           }
         }
@@ -38,48 +40,51 @@
     .pulse-indicator {
       animation: pulse-ring 2s infinite ease-in-out;
     }
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20%, 60% { transform: translateX(-8px); }
-      40%, 80% { transform: translateX(8px); }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
     }
-    .shake-anim {
-      animation: shake 0.4s ease-in-out;
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(93, 80, 162, 0.2);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(93, 80, 162, 0.4);
     }
   </style>
 </head>
-<body class="bg-slate-100 dark:bg-[#0A0E14] text-slate-800 dark:text-gray-100 min-h-screen font-sans antialiased transition-colors duration-200">
+<body class="bg-[#E5E9F2] dark:bg-[#0B0F17] text-slate-800 dark:text-gray-100 min-h-screen font-sans antialiased transition-colors duration-200 p-2 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center">
 
   <!-- ============================================================== -->
-  <!-- MODERN SAAS AUTHENTICATION MODAL (CLEAN, HUMAN & MOBILE RESPONSIVE) -->
+  <!-- MODERN SAAS AUTHENTICATION MODAL (LOGIN & VERIFIED SIGN UP) -->
   <!-- ============================================================== -->
-  <div id="auth-overlay" class="fixed inset-0 z-50 bg-slate-900/70 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-    <div id="auth-card" class="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-[440px] shadow-2xl relative p-6 sm:p-8 my-auto transition-all">
+  <div id="auth-overlay" class="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div id="auth-card" class="bg-white dark:bg-[#121824] border border-slate-200/80 dark:border-slate-800 rounded-3xl w-full max-w-[440px] shadow-2xl relative p-6 sm:p-8 my-auto transition-all">
       
-      <!-- Brand Header -->
-      <div class="flex items-center space-x-3 mb-6">
-        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
-          <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <!-- 4 Corner Brackets -->
+      <!-- Brand Logo & Header -->
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#5D50A2] to-[#FF5C7E] flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-[#5D50A2]/20">
+          <svg class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
             <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
             <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
             <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-            <!-- Facial Reticle -->
             <circle cx="9" cy="10" r="1.2" fill="currentColor"/>
             <circle cx="15" cy="10" r="1.2" fill="currentColor"/>
             <path d="M9.5 15a3.5 3.5 0 0 0 5 0"/>
           </svg>
         </div>
-        <div>
-          <h1 class="text-lg font-bold text-slate-900 dark:text-white leading-tight">FaceID Attendance</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Enterprise Kiosk & Attendance Fleet</p>
-        </div>
+        <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">FaceID Attendance</h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Multi-Tenant Hardware Kiosk & HR Cloud</p>
       </div>
 
-      <!-- Segmented Mode Switcher (Clean SaaS Pill) -->
-      <div class="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl mb-6 text-xs font-semibold">
-        <button type="button" id="tab-btn-login" onclick="switchAuthMode('login')" class="py-2 rounded-lg text-center transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm cursor-pointer">
+      <!-- Segmented Pill Switcher (Sign In vs Create Account) -->
+      <div class="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl mb-6 text-xs select-none">
+        <button type="button" id="tab-btn-login" onclick="switchAuthMode('login')" class="py-2 rounded-lg text-center transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm cursor-pointer font-semibold">
           Sign In
         </button>
         <button type="button" id="tab-btn-signup" onclick="switchAuthMode('signup')" class="py-2 rounded-lg text-center transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer font-medium">
@@ -87,91 +92,68 @@
         </button>
       </div>
 
-      <!-- Alert Notification Banner -->
+      <!-- Live Error / Success Notification Alert Box -->
       <div id="auth-alert-box" class="hidden mb-4 p-3 rounded-xl text-xs font-medium flex items-start space-x-2.5">
         <span id="auth-alert-icon" class="shrink-0 mt-0.5"></span>
-        <span id="auth-alert-text" class="leading-relaxed"></span>
+        <span id="auth-alert-text" class="flex-1 leading-relaxed"></span>
       </div>
 
-      <!-- ============================================== -->
-      <!-- VIEW 1: SIGN IN -->
-      <!-- ============================================== -->
+      <!-- VIEW 1: SIGN IN FORM -->
       <div id="auth-view-login" class="space-y-4">
         <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
           <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Email address</label>
-            <input id="login-email" type="email" required placeholder="admin@company.com" class="w-full h-11 px-3 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all">
+            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Work Email</label>
+            <input id="login-email" type="email" required autocomplete="email" placeholder="name@company.com" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
           </div>
 
           <div>
             <div class="flex items-center justify-between mb-1.5">
-              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Password</label>
-              <a href="javascript:void(0)" onclick="handleForgotPassword()" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Forgot password?</a>
+              <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">Password</label>
             </div>
-            <div class="relative">
-              <input id="login-password" type="password" required placeholder="••••••••" class="w-full h-11 px-3 pr-10 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all">
-              <button type="button" onclick="togglePasswordVisibility('login-password', 'login-eye-icon')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">
-                <span id="login-eye-icon">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
-                  </svg>
-                </span>
-              </button>
-            </div>
+            <input id="login-password" type="password" required autocomplete="current-password" placeholder="••••••••" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
           </div>
 
           <div class="pt-1">
-            <button type="submit" id="login-submit-btn" class="w-full h-11 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center space-x-2">
-              <span>Sign In</span>
+            <button type="submit" id="login-btn" class="w-full h-11 bg-[#5D50A2] hover:bg-[#4E428D] active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#5D50A2]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
+              <span>Sign In to Workspace</span>
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+              </svg>
             </button>
           </div>
         </form>
 
         <div class="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
-          Don't have a workspace? 
-          <button type="button" id="link-goto-signup" onclick="switchAuthMode('signup')" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer ml-1">Sign up here</button>
+          New company or organization? 
+          <button type="button" id="link-goto-signup" onclick="switchAuthMode('signup')" class="text-[#5D50A2] dark:text-purple-300 font-semibold hover:underline cursor-pointer ml-1">Sign up here</button>
         </div>
       </div>
 
-      <!-- ============================================== -->
-      <!-- VIEW 2: SIGN UP - STEP 1 (EMAIL ONLY) -->
-      <!-- ============================================== -->
+      <!-- VIEW 2: SIGN UP - STEP 1 (EMAIL ENTRY) -->
       <div id="auth-view-signup-1" class="space-y-4 hidden">
         <div class="mb-2">
           <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
             <span class="font-medium text-slate-700 dark:text-slate-300">Step 1 of 3</span>
-            <span>Organization Email</span>
+            <span>Work Email</span>
           </div>
           <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-blue-600 h-full w-1/3 rounded-full transition-all duration-300"></div>
+            <div class="bg-[#5D50A2] h-full w-1/3 rounded-full transition-all duration-300"></div>
           </div>
-        </div>
-
-        <div class="text-left mb-1">
-          <h2 class="text-base font-semibold text-slate-900 dark:text-white">Create your workspace</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">We'll send a verification code to confirm your email</p>
         </div>
 
         <form onsubmit="handleSignupStep1Submit(event)" class="space-y-4">
           <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Work email address</label>
-            <input id="signup-email" type="email" required placeholder="name@company.com" class="w-full h-11 px-3 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all">
-            
-            <!-- Quick domain chips -->
-            <div class="flex items-center space-x-1.5 mt-2">
-              <span class="text-[10px] text-slate-400">Quick fill:</span>
-              <button type="button" onclick="appendDomain('@gmail.com')" class="px-2 py-0.5 text-[10px] rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer">@gmail.com</button>
-              <button type="button" onclick="appendDomain('@outlook.com')" class="px-2 py-0.5 text-[10px] rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer">@outlook.com</button>
-            </div>
+            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Your Work Email</label>
+            <input id="signup-email" type="email" required autocomplete="email" placeholder="admin@yourcompany.com" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Company or Workspace Name <span class="text-slate-400 font-normal">(Optional)</span></label>
-            <input id="signup-company" type="text" placeholder="Acme Inc." class="w-full h-11 px-3 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all">
+            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Company or Organization Name (Optional)</label>
+            <input id="signup-company" type="text" placeholder="Acme Inc." class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
           </div>
 
           <div class="pt-1">
-            <button type="submit" id="signup-1-btn" class="w-full h-11 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center space-x-2">
+            <button type="submit" id="signup-1-btn" class="w-full h-11 bg-[#5D50A2] hover:bg-[#4E428D] active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#5D50A2]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
               <span>Send Verification Code</span>
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
@@ -182,13 +164,11 @@
 
         <div class="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
           Already have an account? 
-          <button type="button" id="link-goto-login" onclick="switchAuthMode('login')" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer ml-1">Sign in</button>
+          <button type="button" id="link-goto-login" onclick="switchAuthMode('login')" class="text-[#5D50A2] dark:text-purple-300 font-semibold hover:underline cursor-pointer ml-1">Sign in</button>
         </div>
       </div>
 
-      <!-- ============================================== -->
       <!-- VIEW 3: SIGN UP - STEP 2 (OTP CODE ENTRY) -->
-      <!-- ============================================== -->
       <div id="auth-view-signup-2" class="space-y-4 hidden">
         <div class="mb-2">
           <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
@@ -196,22 +176,21 @@
             <span>Enter Code</span>
           </div>
           <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-blue-600 h-full w-2/3 rounded-full transition-all duration-300"></div>
+            <div class="bg-[#5D50A2] h-full w-2/3 rounded-full transition-all duration-300"></div>
           </div>
         </div>
 
         <div class="text-center mb-4">
-          <h2 class="text-base font-semibold text-slate-900 dark:text-white">Check your inbox</h2>
+          <h2 class="text-base font-semibold text-slate-900 dark:text-white">Check your email</h2>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
             We sent a verification code to <b id="otp-target-email" class="text-slate-900 dark:text-white font-medium"></b>
           </p>
         </div>
 
         <form onsubmit="handleSignupStep2Submit(event)" class="space-y-4">
-          <!-- Universal OTP Input (Handles 6, 7, 8 or 10 digits seamlessly) -->
           <div>
             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5 text-center">
-              Verification Code (from email)
+              Verification Code
             </label>
             <input 
               id="signup-otp-input" 
@@ -221,86 +200,64 @@
               maxlength="10" 
               placeholder="••••••••" 
               required
-              class="w-full h-14 text-center font-mono text-2xl font-bold tracking-[0.35em] bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all"
+              class="w-full h-14 text-center font-mono text-2xl font-bold tracking-[0.35em] bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:border-[#5D50A2] focus:ring-4 focus:ring-[#5D50A2]/20 transition-all"
             >
             <p class="text-[11px] text-slate-400 dark:text-slate-500 text-center mt-1.5">
-              Paste or type your 6-digit or 8-digit code
+              Paste or enter your 6-digit or 8-digit code
             </p>
           </div>
 
-          <!-- Resend & Change Email Actions -->
-          <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
-            <button type="button" onclick="goToSignupStep1()" class="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-              ← Change email
-            </button>
-            <button type="button" id="btn-resend-otp" onclick="resendOtpCode()" class="hover:text-blue-600 dark:hover:text-blue-400 font-medium cursor-pointer">
-              Resend in <span id="resend-countdown">30</span>s
-            </button>
-          </div>
-
           <div class="pt-1">
-            <button type="submit" id="signup-2-btn" class="w-full h-11 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center space-x-2">
-              <span>Verify Code & Continue</span>
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            <button type="submit" id="signup-2-btn" class="w-full h-11 bg-[#5D50A2] hover:bg-[#4E428D] active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#5D50A2]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
+              <span>Verify Code</span>
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
               </svg>
             </button>
           </div>
         </form>
+
+        <div class="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
+          <button type="button" onclick="goToSignupStep(1)" class="text-slate-500 hover:text-slate-800 dark:hover:text-white cursor-pointer">
+            ← Change email
+          </button>
+          <div>
+            Didn't receive it? 
+            <button type="button" id="resend-btn" onclick="resendOtpCode()" class="text-[#5D50A2] dark:text-purple-300 font-semibold hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              Resend code
+            </button>
+            <span id="resend-timer-text" class="text-slate-400 text-[11px] hidden ml-1"></span>
+          </div>
+        </div>
       </div>
 
-      <!-- ============================================== -->
-      <!-- VIEW 4: SIGN UP - STEP 3 (PASSWORD & SECURITY) -->
-      <!-- ============================================== -->
+      <!-- VIEW 4: SIGN UP - STEP 3 (PASSWORD SETUP) -->
       <div id="auth-view-signup-3" class="space-y-4 hidden">
         <div class="mb-2">
           <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
             <span class="font-medium text-slate-700 dark:text-slate-300">Step 3 of 3</span>
-            <span>Set Password</span>
+            <span>Create Password</span>
           </div>
           <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-blue-600 h-full w-full rounded-full transition-all duration-300"></div>
+            <div class="bg-[#5D50A2] h-full w-full rounded-full transition-all duration-300"></div>
           </div>
-        </div>
-
-        <div class="text-left mb-1">
-          <h2 class="text-base font-semibold text-slate-900 dark:text-white">Set your password</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Choose a secure password for your admin account</p>
         </div>
 
         <form onsubmit="handleSignupStep3Submit(event)" class="space-y-3.5">
           <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Create password</label>
-            <div class="relative">
-              <input id="signup-pass-1" type="password" required minlength="6" placeholder="At least 6 characters" class="w-full h-11 px-3 pr-10 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all">
-              <button type="button" onclick="togglePasswordVisibility('signup-pass-1', 'eye-pass-1')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">
-                <span id="eye-pass-1">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
-                  </svg>
-                </span>
-              </button>
-            </div>
+            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Create Admin Password</label>
+            <input id="signup-password" type="password" required autocomplete="new-password" placeholder="At least 6 characters" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Confirm password</label>
-            <div class="relative">
-              <input id="signup-pass-2" type="password" required minlength="6" placeholder="Re-type password" class="w-full h-11 px-3 pr-10 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all">
-              <button type="button" onclick="togglePasswordVisibility('signup-pass-2', 'eye-pass-2')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">
-                <span id="eye-pass-2">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
-                  </svg>
-                </span>
-              </button>
-            </div>
+            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Confirm Admin Password</label>
+            <input id="signup-confirm-password" type="password" required autocomplete="new-password" placeholder="Repeat password" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
           </div>
 
-          <!-- Human Verification Checkbox -->
+          <!-- Human / Admin Verification Checkbox -->
           <div class="pt-1">
             <label class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 flex items-center space-x-3 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors">
-              <input type="checkbox" id="human-verify-check" required class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer">
+              <input type="checkbox" id="human-verify-check" required class="w-4 h-4 text-[#5D50A2] rounded border-slate-300 focus:ring-[#5D50A2] cursor-pointer">
               <span class="text-xs text-slate-700 dark:text-slate-300">
                 I confirm I am setting up this workspace as an authorized administrator
               </span>
@@ -308,7 +265,7 @@
           </div>
 
           <div class="pt-2">
-            <button type="submit" id="signup-3-btn" class="w-full h-11 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center space-x-2">
+            <button type="submit" id="signup-3-btn" class="w-full h-11 bg-[#5D50A2] hover:bg-[#4E428D] active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#5D50A2]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
               <span>Complete Setup & Log In</span>
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"/>
@@ -321,317 +278,657 @@
     </div>
   </div>
 
-  <!-- Top Navigation Bar (Clean SaaS & Mobile Responsive) -->
-  <header class="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur sticky top-0 z-40 transition-colors duration-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2.5 flex flex-wrap items-center justify-between gap-3">
+  <!-- ============================================================== -->
+  <!-- MAIN APP CONTAINER (SOFT-CLAY FLOATING CANVAS MATCHING IMAGE) -->
+  <!-- ============================================================== -->
+  <div class="w-full max-w-[1440px] bg-[#F8FAFD] dark:bg-[#121622] rounded-[36px] sm:rounded-[44px] shadow-[0_25px_70px_rgba(75,63,142,0.14)] border border-white/80 dark:border-slate-800 p-4 sm:p-6 lg:p-7 flex flex-col md:flex-row gap-5 lg:gap-7 relative min-h-[92vh]">
+
+    <!-- ============================================================== -->
+    <!-- LEFT NAVBAR: VERTICAL PILL DOCK (DEEP PURPLE FLOATING PILL) -->
+    <!-- ============================================================== -->
+    <aside id="navbar-pill-dock" class="w-full md:w-[74px] lg:w-[80px] bg-[#5D50A2] dark:bg-[#4A3E8A] rounded-[32px] sm:rounded-[36px] py-5 px-3 flex md:flex-col items-center justify-between shadow-xl shadow-[#5D50A2]/25 shrink-0 z-30 transition-all">
       
-      <!-- Brand & Title -->
-      <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
-          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
-            <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
-            <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
-            <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-            <circle cx="9" cy="10" r="1.2" fill="currentColor"/>
-            <circle cx="15" cy="10" r="1.2" fill="currentColor"/>
-            <path d="M9.5 15a3.5 3.5 0 0 0 5 0"/>
-          </svg>
-        </div>
+      <!-- Top Action: Notification Bell -->
+      <div class="shrink-0">
+        <button id="dock-btn-notif" type="button" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center relative cursor-pointer transition-all" title="Notifications">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span class="w-2.5 h-2.5 rounded-full bg-[#FF5C7E] border-2 border-[#5D50A2] absolute top-2.5 right-2.5"></span>
+        </button>
+      </div>
+
+      <!-- Center Icon Stack: Navigation Tabs -->
+      <nav class="flex md:flex-col items-center space-x-2 md:space-x-0 md:space-y-3.5 my-auto">
+        <!-- 1. Primary Dashboard -->
+        <button type="button" id="dock-tab-dashboard" onclick="switchTab('dashboard')" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white text-[#5D50A2] shadow-lg shadow-black/10 flex items-center justify-center cursor-pointer transition-all" title="Primary Dashboard">
+          <i data-lucide="home" class="w-5 h-5"></i>
+        </button>
+
+        <!-- 2. Live Punch Feed -->
+        <button type="button" id="dock-tab-live" onclick="switchTab('live')" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all" title="Live Attendance Stream">
+          <i data-lucide="activity" class="w-5 h-5"></i>
+        </button>
+
+        <!-- 3. Web Kiosk Face Scanner -->
+        <button type="button" id="dock-tab-scanner" onclick="switchTab('scanner')" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all" title="Webcam Face Scanner Kiosk">
+          <i data-lucide="camera" class="w-5 h-5"></i>
+        </button>
+
+        <!-- 4. Reports & Summary -->
+        <button type="button" id="dock-tab-summary" onclick="switchTab('summary')" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all" title="Attendance Analytics & Summary">
+          <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+        </button>
+
+        <!-- 5. Staff & Facial Registry -->
+        <button type="button" id="dock-tab-employees" onclick="switchTab('employees')" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all" title="Staff & Biometric Face Registry">
+          <i data-lucide="users" class="w-5 h-5"></i>
+        </button>
+
+        <!-- 6. Account & Workspace Settings -->
+        <button type="button" id="dock-tab-account" onclick="switchTab('account')" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all" title="Account & Workspace Settings">
+          <i data-lucide="user-cog" class="w-5 h-5"></i>
+        </button>
+      </nav>
+
+      <!-- Bottom Action: Sign Out -->
+      <div class="shrink-0">
+        <button type="button" id="dock-btn-logout" onclick="handleUserLogout()" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-purple-200 hover:text-rose-300 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all" title="Sign Out of Workspace">
+          <i data-lucide="log-out" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ============================================================== -->
+    <!-- MAIN WORKSPACE CONTENT (HEADER + DYNAMIC VIEWS + RIGHT PANEL) -->
+    <!-- ============================================================== -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- TOP HEADER BAR -->
+      <header class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 class="font-bold text-base text-slate-900 dark:text-white tracking-tight">FaceID Attendance</h1>
-          <p class="text-[11px] text-slate-500 dark:text-slate-400">Kiosk Fleet & HR Dashboard</p>
+          <span class="text-[11px] font-bold text-purple-400 dark:text-purple-300 uppercase tracking-widest block">Primary</span>
+          <h1 id="page-title" class="text-2xl sm:text-3xl font-extrabold text-[#2C2754] dark:text-white tracking-tight">Dashboard</h1>
         </div>
-      </div>
 
-      <!-- Navigation Tabs (Horizontally scrollable on mobile) -->
-      <div class="flex items-center space-x-2 overflow-x-auto max-w-full pb-1 sm:pb-0">
-        <div class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60 shrink-0">
-          <button id="tab-live-btn" onclick="switchTab('live')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer">
-            <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-            <span>Live Feed</span>
+        <!-- Right Controls: Search, Fleet Pill, Profile Avatar -->
+        <div class="flex items-center space-x-2.5 sm:space-x-3.5">
+          <!-- Search Pill -->
+          <div class="relative hidden sm:block">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input id="global-search" oninput="handleGlobalSearch(this.value)" type="text" placeholder="Search..." class="bg-white dark:bg-slate-800/90 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 dark:border-slate-700/60 rounded-full pl-9 pr-4 py-2 text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-[#5D50A2] w-44 lg:w-56 transition-all">
+          </div>
+
+          <!-- Active Kiosks Fleet Button -->
+          <button onclick="openKiosksModal()" id="active-kiosks-btn" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center space-x-1.5 hover:bg-emerald-100 transition-all shrink-0 cursor-pointer" title="View Active Kiosks Hardware Fleet">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="active-kiosks-text">0 Kiosks Active</span>
           </button>
-          <button id="tab-scanner-btn" onclick="switchTab('scanner')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center space-x-1.5 cursor-pointer">
-            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-            <span>Web Kiosk</span>
+
+          <!-- Light / Dark Theme Switcher Button -->
+          <button id="theme-toggle-btn" onclick="toggleTheme()" class="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-slate-100 dark:border-slate-700 transition-all shrink-0 cursor-pointer" title="Toggle Theme">
+            <i id="theme-icon" data-lucide="sun" class="w-4 h-4 text-amber-500"></i>
           </button>
-          <button id="tab-summary-btn" onclick="switchTab('summary')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center space-x-1.5 cursor-pointer">
-            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
-            <span>Summary</span>
+
+          <!-- Danger Zone: Reset System Data Button -->
+          <button onclick="openResetModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/50 flex items-center space-x-1 transition-all shrink-0 cursor-pointer" title="Reset all attendance logs, punches & employee facial data">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Reset</span>
           </button>
-          <button id="tab-employees-btn" onclick="switchTab('employees')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center space-x-1.5 cursor-pointer">
-            <i data-lucide="users" class="w-3.5 h-3.5"></i>
-            <span>Employees</span>
-          </button>
-        </div>
 
-        <!-- Active Kiosks Pill Badge -->
-        <button onclick="openKiosksModal()" id="active-kiosks-btn" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center space-x-1.5 hover:bg-emerald-500/20 transition-all shrink-0 cursor-pointer" title="View Active Kiosks Fleet">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span id="active-kiosks-text">0 Kiosks Active</span>
-        </button>
-
-        <!-- User / Tenant Badge -->
-        <div id="user-profile-badge" class="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shrink-0">
-          <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
-          <span id="tenant-display-name">Workspace</span>
-        </div>
-
-        <!-- Light / Dark Theme Switcher Button -->
-        <button id="theme-toggle-btn" onclick="toggleTheme()" class="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all shrink-0 cursor-pointer" title="Toggle Theme">
-          <i id="theme-icon" data-lucide="sun" class="w-4 h-4 text-amber-500 dark:text-amber-400"></i>
-        </button>
-
-        <!-- Sign Out Button -->
-        <button onclick="handleUserLogout()" class="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 transition-all shrink-0 cursor-pointer" title="Sign Out of Workspace">
-          <i data-lucide="log-out" class="w-4 h-4"></i>
-        </button>
-
-        <!-- Danger Zone: Reset System Data Button -->
-        <button onclick="openResetModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/50 flex items-center space-x-1 transition-all shrink-0 cursor-pointer" title="Reset all attendance logs, punches & employee facial data">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          <span class="hidden sm:inline">Reset</span>
-        </button>
-      </div>
-    </div>
-  </header>
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          <span>Reset All</span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Container -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-
-    <!-- KPI Metrics Cards (Pure Punch-In Kiosk Analytics) -->
-    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-5 shadow-sm dark:shadow-lg transition-colors">
-        <div class="flex items-center justify-between text-slate-500 dark:text-gray-400 mb-3">
-          <span class="text-xs font-semibold uppercase tracking-wider">Total Staff</span>
-          <div class="p-2 rounded-lg bg-blue-500/10 text-blue-500 dark:text-blue-400"><i data-lucide="users" class="w-5 h-5"></i></div>
-        </div>
-        <div class="flex items-baseline space-x-2">
-          <span id="metric-total-employees" class="text-3xl font-extrabold text-slate-900 dark:text-white">0</span>
-          <span class="text-xs text-slate-500 dark:text-gray-500">enrolled profiles</span>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-5 shadow-sm dark:shadow-lg transition-colors">
-        <div class="flex items-center justify-between text-slate-500 dark:text-gray-400 mb-3">
-          <span class="text-xs font-semibold uppercase tracking-wider">Present Today</span>
-          <div class="p-2 rounded-lg bg-green-500/10 text-green-500 dark:text-green-400"><i data-lucide="user-check" class="w-5 h-5"></i></div>
-        </div>
-        <div class="flex items-baseline space-x-2">
-          <span id="metric-present-today" class="text-3xl font-extrabold text-green-600 dark:text-green-400">0</span>
-          <span class="text-xs text-slate-500 dark:text-gray-500">punched in</span>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-5 shadow-sm dark:shadow-lg transition-colors">
-        <div class="flex items-center justify-between text-slate-500 dark:text-gray-400 mb-3">
-          <span class="text-xs font-semibold uppercase tracking-wider">Absent Today</span>
-          <div class="p-2 rounded-lg bg-red-500/10 text-red-500 dark:text-red-400"><i data-lucide="user-x" class="w-5 h-5"></i></div>
-        </div>
-        <div class="flex items-baseline space-x-2">
-          <span id="metric-absent-today" class="text-3xl font-extrabold text-red-600 dark:text-red-400">0</span>
-          <span class="text-xs text-slate-500 dark:text-gray-500">pending arrivals</span>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-5 shadow-sm dark:shadow-lg transition-colors">
-        <div class="flex items-center justify-between text-slate-500 dark:text-gray-400 mb-3">
-          <span class="text-xs font-semibold uppercase tracking-wider">Late Arrivals</span>
-          <div class="p-2 rounded-lg bg-amber-500/10 text-amber-500 dark:text-amber-400"><i data-lucide="clock" class="w-5 h-5"></i></div>
-        </div>
-        <div class="flex items-baseline space-x-2">
-          <span id="metric-late-today" class="text-3xl font-extrabold text-amber-600 dark:text-amber-400">0</span>
-          <span class="text-xs text-slate-500 dark:text-gray-500">after 09:30 AM</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- VIEW 1: LIVE ATTENDANCE FEED -->
-    <div id="view-live" class="space-y-6">
-      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-6 shadow-sm dark:shadow-xl transition-colors">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div class="flex items-center space-x-3">
-            <div class="relative flex items-center justify-center">
-              <span class="w-3 h-3 bg-green-500 dark:bg-green-400 rounded-full"></span>
-              <span class="absolute w-5 h-5 bg-green-500 dark:bg-green-400 rounded-full pulse-indicator"></span>
+          <!-- User Profile Avatar Pill -->
+          <div id="user-profile-badge" onclick="switchTab('account')" class="flex items-center space-x-2 pl-1 pr-3 py-1 bg-white dark:bg-slate-800 rounded-full shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 dark:border-slate-700/60 cursor-pointer hover:border-purple-300 transition-all" title="View Account Profile">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-[#5D50A2] to-[#FF5C7E] text-white flex items-center justify-center font-bold text-xs ring-2 ring-white shadow-sm">
+              <span id="tenant-avatar-initial">A</span>
             </div>
-            <div>
-              <h2 class="text-lg font-bold text-slate-900 dark:text-white">Live Attendance Stream</h2>
-              <p class="text-xs text-slate-500 dark:text-gray-400">Realtime facial recognition punches stream here automatically</p>
-            </div>
+            <span id="tenant-display-name" class="text-xs font-semibold text-slate-700 dark:text-slate-200 max-w-[100px] truncate">Admin</span>
           </div>
+        </div>
+      </header>
 
-          <!-- Controls: Search, Manual Punch & Export -->
-          <div class="flex flex-wrap items-center gap-3">
-            <div class="relative">
-              <i data-lucide="search" class="w-4 h-4 text-slate-400 dark:text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-              <input id="search-attendance" oninput="filterAttendanceLogs()" type="text" placeholder="Search employee..." class="bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400 w-44 sm:w-56">
+      <!-- 2-COLUMN GRID: CENTER MAIN CONTENT + RIGHT SIDEBAR (MATCHING INSPIRATION) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start">
+        
+        <!-- LEFT 8-COLUMN CONTENT CONTAINER (DYNAMIC VIEWS) -->
+        <div class="lg:col-span-8 space-y-6">
+
+          <!-- ============================================== -->
+          <!-- VIEW 0: PRIMARY OVERVIEW DASHBOARD (INSPIRATION) -->
+          <!-- ============================================== -->
+          <div id="view-dashboard" class="space-y-6">
+
+            <!-- 1. HERO CARD: OVERVIEW WITH ATTENDANCE WAVE GRAPH -->
+            <div class="bg-gradient-to-r from-[#594EA1] via-[#685DB1] to-[#786BC0] text-white rounded-[32px] p-6 sm:p-7 shadow-xl shadow-[#5D50A2]/20 relative overflow-hidden">
+              <!-- Top Row: Overview Title & Timeframe Switcher -->
+              <div class="flex items-center justify-between mb-4 relative z-10">
+                <h2 class="text-lg sm:text-xl font-bold tracking-wide">Overview</h2>
+                <div class="flex items-center space-x-1.5 bg-white/15 backdrop-blur-md rounded-full px-3 py-1 text-xs font-medium cursor-pointer">
+                  <span>Today</span>
+                  <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                </div>
+              </div>
+
+              <!-- Interactive Wave Chart Visual (Matching Inspo) -->
+              <div class="relative h-44 sm:h-52 w-full my-2 flex items-center justify-center">
+                <!-- SVG Wave Graphic with Glowing Pink Path -->
+                <svg class="w-full h-full" viewBox="0 0 600 180" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#FF5C7E" stop-opacity="0.35"/>
+                      <stop offset="100%" stop-color="#594EA1" stop-opacity="0.0"/>
+                    </linearGradient>
+                  </defs>
+                  <!-- Filled Wave Area -->
+                  <path d="M 0,110 C 60,60 120,130 180,90 C 240,50 300,120 360,70 C 420,30 480,100 540,80 L 600,95 L 600,180 L 0,180 Z" fill="url(#waveGradient)"/>
+                  <!-- Vibrant Glowing Stroke -->
+                  <path d="M 0,110 C 60,60 120,130 180,90 C 240,50 300,120 360,70 C 420,30 480,100 540,80 L 600,95" fill="none" stroke="#FF5C7E" stroke-width="3.5" stroke-linecap="round"/>
+                  <!-- Node Highlight Dot -->
+                  <circle cx="360" cy="70" r="7" fill="#FFFFFF" stroke="#FF5C7E" stroke-width="4.5"/>
+                </svg>
+
+                <!-- Floating Tooltip Pill (Matching "9.178 Steps" in image) -->
+                <div class="absolute left-1/2 sm:left-[55%] top-4 -translate-x-1/2 bg-white/95 backdrop-blur text-slate-800 px-3.5 py-1.5 rounded-2xl shadow-xl flex items-center space-x-2 border border-white">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#FF5C7E]"></span>
+                  <span id="hero-wave-badge" class="font-bold text-xs">Punches Stream</span>
+                </div>
+              </div>
+
+              <!-- Month / Period Axis Markers -->
+              <div class="flex justify-between text-[11px] text-purple-200/80 px-2 font-medium mb-5">
+                <span>08:00</span>
+                <span>09:00</span>
+                <span>10:00</span>
+                <span class="bg-white text-[#5D50A2] font-bold px-2 py-0.5 rounded-full shadow-sm">12:00</span>
+                <span>14:00</span>
+                <span>16:00</span>
+                <span>18:00</span>
+              </div>
+
+              <!-- Bottom Cutout Stat Shelf (Inspired by Inspo Cutout Design) -->
+              <div class="pt-4 border-t border-white/15 grid grid-cols-3 gap-2 text-center items-center">
+                <div>
+                  <span class="text-[11px] text-purple-200 uppercase font-semibold block">Total Today</span>
+                  <span id="hero-total-punches" class="text-xl sm:text-2xl font-black">0 Punches</span>
+                </div>
+                <div class="bg-white/20 backdrop-blur-md rounded-2xl py-2 px-3 border border-white/20 shadow-md">
+                  <span class="text-[11px] text-white uppercase font-bold block">On-Time Rate</span>
+                  <span id="hero-ontime-rate" class="text-xl sm:text-2xl font-black text-white">98%</span>
+                </div>
+                <div>
+                  <span class="text-[11px] text-purple-200 uppercase font-semibold block">Registered Staff</span>
+                  <span id="hero-total-staff" class="text-xl sm:text-2xl font-black">0 Staff</span>
+                </div>
+              </div>
             </div>
 
-            <button onclick="openManualPunchModal()" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-500/25 border border-green-500/40 flex items-center space-x-2 transition-all">
-              <i data-lucide="plus-circle" class="w-4 h-4"></i>
-              <span>Manual Punch</span>
-            </button>
+            <!-- 2. MIDDLE TWO BIG CARDS (PURPLE + CORAL PINK FROM IMAGE) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              
+              <!-- Purple Card: Active Kiosks Fleet -->
+              <div onclick="openKiosksModal()" class="bg-[#675CB0] text-white rounded-[28px] p-5 shadow-lg shadow-purple-900/10 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform">
+                <div class="flex items-center space-x-4 mb-4">
+                  <div class="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner">
+                    <i data-lucide="smartphone" class="w-6 h-6"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-base">Active Kiosks</h3>
+                    <p class="text-xs text-purple-200">Hardware Fleet Terminals</p>
+                  </div>
+                </div>
+                <div class="flex items-end justify-between">
+                  <div>
+                    <span id="dash-kiosks-count" class="text-3xl font-extrabold">0</span>
+                    <span class="text-xs text-purple-200 ml-1">online</span>
+                  </div>
+                  <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/15 text-white flex items-center space-x-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Live Ping</span>
+                  </span>
+                </div>
+              </div>
 
-            <button onclick="exportToCSV()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-200 border border-gray-300 dark:border-gray-700 flex items-center space-x-2 transition-all">
-              <i data-lucide="download" class="w-3.5 h-3.5"></i>
-              <span>Export CSV</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Attendance Logs Table -->
-        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-brand-border">
-          <table class="w-full text-left text-sm text-slate-700 dark:text-gray-300">
-            <thead class="bg-slate-50 dark:bg-[#0D121A] text-xs uppercase tracking-wider text-slate-500 dark:text-gray-400 border-b border-gray-200 dark:border-brand-border">
-              <tr>
-                <th class="py-3.5 px-4 font-semibold">Employee</th>
-                <th class="py-3.5 px-4 font-semibold">Status</th>
-                <th class="py-3.5 px-4 font-semibold">Time & Date</th>
-                <th class="py-3.5 px-4 font-semibold">Punctuality</th>
-                <th class="py-3.5 px-4 font-semibold">Source / Device</th>
-                <th class="py-3.5 px-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="attendance-table-body" class="divide-y divide-gray-200 dark:divide-brand-border bg-white dark:bg-[#121822]">
-              <!-- Populated by JavaScript -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW 2: WEB KIOSK / SCAN FACE THROUGH BROWSER -->
-    <div id="view-scanner" class="hidden space-y-6">
-      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-3xl p-6 shadow-sm dark:shadow-xl transition-colors">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <div class="flex items-center space-x-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-              <h2 class="text-lg font-bold text-slate-900 dark:text-white">Web Kiosk Face Scanner</h2>
+              <!-- Coral Pink Card: Today Punches -->
+              <div onclick="switchTab('live')" class="bg-gradient-to-br from-[#FF5C7E] to-[#FF456A] text-white rounded-[28px] p-5 shadow-lg shadow-rose-900/10 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform">
+                <div class="flex items-center space-x-4 mb-4">
+                  <div class="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner">
+                    <i data-lucide="scan-face" class="w-6 h-6"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-base">Biometric Punches</h3>
+                    <p class="text-xs text-rose-100">Live Face Registrations</p>
+                  </div>
+                </div>
+                <div class="flex items-end justify-between">
+                  <div>
+                    <span id="dash-today-punches" class="text-3xl font-extrabold">0</span>
+                    <span class="text-xs text-rose-100 ml-1">today</span>
+                  </div>
+                  <div class="w-9 h-9 rounded-full bg-white text-[#FF5C7E] flex items-center justify-center shadow-md">
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p class="text-xs text-slate-500 dark:text-gray-400">Scan and record employee attendance live through your webcam</p>
+
+            <!-- 3. BOTTOM ROW: THREE WHITE FLOATING STAT CARDS (EXACT MATCH TO IMAGE) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+              
+              <!-- Card A: Biometric Face Coverage -->
+              <div class="bg-white dark:bg-[#151B28] rounded-[24px] p-5 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)] relative">
+                <div class="w-11 h-11 rounded-2xl bg-[#5D50A2] text-white flex items-center justify-center shadow-md shadow-[#5D50A2]/20 mx-auto -mt-8 mb-3">
+                  <i data-lucide="user-check" class="w-5 h-5"></i>
+                </div>
+                <div class="text-center">
+                  <h4 class="font-bold text-sm text-slate-800 dark:text-white">Face Sync</h4>
+                  <p class="text-[11px] text-slate-400 mt-0.5"><span id="stat-synced-faces">0</span> Profiles Cloud Synced</p>
+                  
+                  <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden my-3">
+                    <div id="stat-synced-bar" class="bg-emerald-500 h-full rounded-full" style="width: 100%"></div>
+                  </div>
+                  <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>Universal Cloud</span>
+                    <span class="text-emerald-600 font-bold">100%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card B: On-Time Attendance -->
+              <div class="bg-white dark:bg-[#151B28] rounded-[24px] p-5 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)] relative">
+                <div class="w-11 h-11 rounded-2xl bg-[#FF5C7E] text-white flex items-center justify-center shadow-md shadow-[#FF5C7E]/20 mx-auto -mt-8 mb-3">
+                  <i data-lucide="clock" class="w-5 h-5"></i>
+                </div>
+                <div class="text-center">
+                  <h4 class="font-bold text-sm text-slate-800 dark:text-white">Punctuality</h4>
+                  <p class="text-[11px] text-slate-400 mt-0.5"><span id="metric-late-today">0</span> Late Arrivals</p>
+                  
+                  <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden my-3">
+                    <div id="stat-punctual-bar" class="bg-[#FF5C7E] h-full rounded-full" style="width: 95%"></div>
+                  </div>
+                  <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>Target 09:30</span>
+                    <span class="text-[#FF5C7E] font-bold">95%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card C: Fleet Health -->
+              <div class="bg-white dark:bg-[#151B28] rounded-[24px] p-5 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)] relative">
+                <div class="w-11 h-11 rounded-2xl bg-[#5D50A2] text-white flex items-center justify-center shadow-md shadow-[#5D50A2]/20 mx-auto -mt-8 mb-3">
+                  <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <div class="text-center">
+                  <h4 class="font-bold text-sm text-slate-800 dark:text-white">Kiosks Health</h4>
+                  <p class="text-[11px] text-slate-400 mt-0.5">Realtime WebSocket Sync</p>
+                  
+                  <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden my-3">
+                    <div class="bg-emerald-500 h-full rounded-full" style="width: 100%"></div>
+                  </div>
+                  <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>Heartbeat</span>
+                    <span class="text-emerald-600 font-bold">Online</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
           </div>
 
-          <div class="flex items-center space-x-3">
-            <button id="web-scanner-toggle-btn" onclick="toggleWebScanner()" class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 text-white dark:text-black dark:bg-cyan-400 hover:bg-cyan-600 dark:hover:bg-cyan-300 flex items-center space-x-2 transition-all">
-              <i data-lucide="camera" class="w-4 h-4"></i>
-              <span id="web-scanner-btn-text">Start Webcam</span>
-            </button>
-          </div>
-        </div>
+          <!-- ============================================== -->
+          <!-- VIEW 1: LIVE ATTENDANCE STREAM & LOGS -->
+          <!-- ============================================== -->
+          <div id="view-live" class="hidden space-y-5">
+            <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div class="flex items-center space-x-3">
+                  <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <div>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">Live Attendance Stream</h2>
+                    <p class="text-xs text-slate-400">Punches from Mobile Kiosks and Web Terminals stream in real-time</p>
+                  </div>
+                </div>
 
-        <!-- Camera Viewport with Oval Overlay -->
-        <div class="relative max-w-xl mx-auto aspect-[4/3] bg-black rounded-3xl overflow-hidden border-2 border-gray-300 dark:border-gray-800 shadow-2xl flex items-center justify-center">
-          <video id="scanner-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
-          <canvas id="scanner-canvas" class="hidden"></canvas>
+                <!-- Controls: Search, Manual Punch & Export -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <div class="relative">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input id="search-attendance" oninput="filterAttendanceLogs()" type="text" placeholder="Filter employee..." class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2] w-40 sm:w-48">
+                  </div>
 
-          <!-- Face Oval Guide -->
-          <div id="scanner-reticle" class="absolute pointer-events-none inset-0 flex items-center justify-center">
-            <div id="scanner-oval" class="w-56 h-72 border-2 border-dashed border-cyan-400/70 rounded-[50%] transition-all duration-300 flex items-center justify-center shadow-[0_0_20px_rgba(24,255,255,0.2)]">
-              <div class="w-full h-full rounded-[50%] border-2 border-cyan-400/20"></div>
+                  <button onclick="openManualPunchModal()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#5D50A2] text-white hover:bg-[#4E428D] flex items-center space-x-1.5 transition-all shadow-sm">
+                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                    <span>Manual Punch</span>
+                  </button>
+
+                  <button onclick="exportToCSV()" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-gray-200 border border-slate-200 dark:border-slate-700 flex items-center space-x-1.5 transition-all">
+                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    <span>Export</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Attendance Logs Table -->
+              <div class="overflow-x-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+                <table class="w-full text-left text-sm text-slate-700 dark:text-gray-300">
+                  <thead class="bg-slate-50 dark:bg-[#111622] text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                    <tr>
+                      <th class="py-3 px-4 font-semibold">Employee</th>
+                      <th class="py-3 px-4 font-semibold">Status</th>
+                      <th class="py-3 px-4 font-semibold">Timestamp</th>
+                      <th class="py-3 px-4 font-semibold">Punctuality</th>
+                      <th class="py-3 px-4 font-semibold">Device Terminal</th>
+                      <th class="py-3 px-4 font-semibold text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="attendance-table-body" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-[#151B28]">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <!-- Bottom Recognition Pill -->
-          <div id="scanner-status-pill" class="absolute bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-2xl bg-black/80 backdrop-blur-md border border-white/20 text-white flex items-center space-x-2.5 shadow-2xl">
-            <span id="scanner-status-dot" class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-            <span id="scanner-status-text" class="text-xs font-semibold">Start camera and position face inside oval</span>
+          <!-- ============================================== -->
+          <!-- VIEW 2: WEB KIOSK / WEBCAM FACE SCANNER -->
+          <!-- ============================================== -->
+          <div id="view-scanner" class="hidden space-y-5">
+            <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h2 class="text-lg font-bold text-slate-900 dark:text-white">Web Kiosk Camera Scanner</h2>
+                  <p class="text-xs text-slate-400">Scan and record employee attendance live through your webcam</p>
+                </div>
+
+                <button id="web-scanner-toggle-btn" onclick="toggleWebScanner()" class="px-4 py-2 rounded-xl text-xs font-bold bg-[#5D50A2] hover:bg-[#4E428D] text-white flex items-center space-x-2 transition-all shadow-md shadow-[#5D50A2]/20">
+                  <i data-lucide="camera" class="w-4 h-4"></i>
+                  <span id="web-scanner-btn-text">Start Webcam</span>
+                </button>
+              </div>
+
+              <!-- Camera Viewport -->
+              <div class="relative max-w-lg mx-auto aspect-[4/3] bg-black rounded-3xl overflow-hidden border-2 border-purple-200 dark:border-slate-700 shadow-2xl flex items-center justify-center">
+                <video id="scanner-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
+                <canvas id="scanner-canvas" class="hidden"></canvas>
+
+                <!-- Face Oval Guide -->
+                <div id="scanner-reticle" class="absolute pointer-events-none inset-0 flex items-center justify-center">
+                  <div id="scanner-oval" class="w-52 h-68 border-2 border-dashed border-[#FF5C7E]/80 rounded-[50%] transition-all duration-300 flex items-center justify-center shadow-[0_0_20px_rgba(255,92,126,0.3)]">
+                    <div class="w-full h-full rounded-[50%] border-2 border-[#5D50A2]/30"></div>
+                  </div>
+                </div>
+
+                <!-- Bottom Recognition Pill -->
+                <div id="scanner-status-pill" class="absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 rounded-2xl bg-black/80 backdrop-blur-md border border-white/20 text-white flex items-center space-x-2 shadow-2xl">
+                  <span id="scanner-status-dot" class="w-2.5 h-2.5 rounded-full bg-[#FF5C7E]"></span>
+                  <span id="scanner-status-text" class="text-xs font-semibold">Start camera and position face in oval</span>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <!-- ============================================== -->
+          <!-- VIEW 3: SUMMARY & ATTENDANCE REPORTS -->
+          <!-- ============================================== -->
+          <div id="view-summary" class="hidden space-y-5">
+            <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h2 class="text-lg font-bold text-slate-900 dark:text-white">Daily & Monthly Summary Report</h2>
+                  <p class="text-xs text-slate-400">Track employee attendance rates, punctuality, and absence records</p>
+                </div>
+
+                <div class="flex items-center space-x-2.5">
+                  <input id="summary-date-picker" onchange="renderSummaryView()" type="date" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
+                  <button onclick="exportSummaryCSV()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-gray-200 border border-slate-200 dark:border-slate-700 flex items-center space-x-1.5 transition-all">
+                    <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                    <span>Export</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Summary Table -->
+              <div class="overflow-x-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+                <table class="w-full text-left text-sm text-slate-700 dark:text-gray-300">
+                  <thead class="bg-slate-50 dark:bg-[#111622] text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                    <tr>
+                      <th class="py-3 px-4 font-semibold">Employee</th>
+                      <th class="py-3 px-4 font-semibold">Department</th>
+                      <th class="py-3 px-4 font-semibold">Punch Time</th>
+                      <th class="py-3 px-4 font-semibold">Status</th>
+                      <th class="py-3 px-4 font-semibold">Punctuality</th>
+                      <th class="py-3 px-4 font-semibold">Days Present</th>
+                    </tr>
+                  </thead>
+                  <tbody id="summary-table-body" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-[#151B28]">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- VIEW 4: EMPLOYEES & FACIAL ROSTER -->
+          <!-- ============================================== -->
+          <div id="view-employees" class="hidden space-y-5">
+            <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h2 class="text-lg font-bold text-slate-900 dark:text-white">Staff Biometric Roster</h2>
+                  <p class="text-xs text-slate-400">Manage enrolled facial profiles and cloud-synchronized staff</p>
+                </div>
+
+                <div class="flex items-center space-x-2.5">
+                  <input id="search-employees" oninput="filterEmployees()" type="text" placeholder="Search staff..." class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2] w-40 sm:w-52">
+                  <button onclick="openAddEmployeeModal()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#5D50A2] hover:bg-[#4E428D] text-white flex items-center space-x-1.5 transition-all shadow-md shadow-[#5D50A2]/20">
+                    <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                    <span>Enroll Staff</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Employees Grid -->
+              <div id="employees-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- VIEW 5: ACCOUNT & WORKSPACE TAB (USER SETTINGS) -->
+          <!-- ============================================== -->
+          <div id="view-account" class="hidden space-y-6">
+            
+            <!-- Account Profile Settings Card -->
+            <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+              <div class="flex items-center space-x-3 mb-6">
+                <div class="w-10 h-10 rounded-2xl bg-[#5D50A2]/15 text-[#5D50A2] dark:text-purple-300 flex items-center justify-center">
+                  <i data-lucide="user-cog" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h2 class="text-lg font-bold text-slate-900 dark:text-white">Workspace & Account Details</h2>
+                  <p class="text-xs text-slate-400">Update your administrator profile and organization branding</p>
+                </div>
+              </div>
+
+              <form onsubmit="handleSaveAccountProfile(event)" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Full Name / Display Name</label>
+                    <input id="account-fullname" type="text" placeholder="e.g. Sparsh Gaba" class="w-full h-11 px-3.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Company / Workspace Name</label>
+                    <input id="account-company" type="text" placeholder="e.g. Acme Tech Corp" class="w-full h-11 px-3.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
+                    <input id="account-email" type="email" disabled class="w-full h-11 px-3.5 text-xs bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 cursor-not-allowed">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Tenant Workspace UID</label>
+                    <input id="account-uid" type="text" readonly class="w-full h-11 px-3.5 text-xs font-mono bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 cursor-copy" title="Click to copy UID" onclick="navigator.clipboard.writeText(this.value); alert('Copied Tenant UID to clipboard!')">
+                  </div>
+                </div>
+
+                <div class="pt-2 flex justify-end">
+                  <button type="submit" id="account-save-profile-btn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#5D50A2] hover:bg-[#4E428D] text-white flex items-center space-x-1.5 shadow-md shadow-[#5D50A2]/20 transition-all">
+                    <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                    <span>Save Profile Changes</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Password Update Card -->
+            <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+              <div class="flex items-center space-x-3 mb-6">
+                <div class="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 flex items-center justify-center">
+                  <i data-lucide="lock" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h2 class="text-lg font-bold text-slate-900 dark:text-white">Security & Password</h2>
+                  <p class="text-xs text-slate-400">Update your workspace admin login password</p>
+                </div>
+              </div>
+
+              <form onsubmit="handleUpdatePassword(event)" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">New Password</label>
+                    <input id="account-new-password" type="password" required placeholder="Minimum 6 characters" class="w-full h-11 px-3.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Confirm New Password</label>
+                    <input id="account-confirm-password" type="password" required placeholder="Repeat new password" class="w-full h-11 px-3.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
+                  </div>
+                </div>
+
+                <div class="pt-2 flex justify-end">
+                  <button type="submit" id="account-update-password-btn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center space-x-1.5 shadow-md transition-all">
+                    <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                    <span>Update Password</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Danger Zone: Delete Account & Workspace -->
+            <div class="bg-rose-50/60 dark:bg-rose-950/20 rounded-[28px] p-6 border border-rose-200/80 dark:border-rose-900/40">
+              <div class="flex items-center space-x-3 mb-3">
+                <div class="w-10 h-10 rounded-2xl bg-rose-500/15 text-rose-600 flex items-center justify-center">
+                  <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h2 class="text-base font-bold text-rose-700 dark:text-rose-400">Danger Zone: Delete Account</h2>
+                  <p class="text-xs text-rose-600/80 dark:text-rose-400/70">Permanently erase your workspace, facial biometric records, and active kiosks</p>
+                </div>
+              </div>
+
+              <p class="text-xs text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
+                Deleting your account will permanently wipe all registered employee facial profiles, attendance logs, and hardware kiosk links from Supabase cloud. This action is irreversible.
+              </p>
+
+              <div class="flex justify-end">
+                <button type="button" onclick="openDeleteAccountModal()" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white flex items-center space-x-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  <span>Delete My Account & Workspace</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
         </div>
+
+        <!-- RIGHT 4-COLUMN SIDEBAR PANEL ("FRIENDS" & "LIVE MAP" FROM INSPIRATION) -->
+        <aside class="lg:col-span-4 space-y-5">
+          
+          <!-- Card 1: Staff & Kiosk Activity ("Friends" from Inspo) -->
+          <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-5 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="users" class="w-4 h-4 text-[#5D50A2]"></i>
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white">Recent Activity</h3>
+              </div>
+              <button onclick="switchTab('live')" class="text-[11px] font-semibold text-[#5D50A2] dark:text-purple-300 hover:underline">View All</button>
+            </div>
+
+            <!-- Segmented Pill Switcher ("Activities" / "Online Kiosks") -->
+            <div class="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4 text-xs select-none">
+              <button type="button" id="sidebar-tab-act" onclick="switchSidebarTab('act')" class="py-1.5 rounded-lg text-center bg-[#5D50A2] text-white font-semibold shadow-sm transition-all cursor-pointer">
+                Activities
+              </button>
+              <button type="button" id="sidebar-tab-kiosks" onclick="switchSidebarTab('kiosks')" class="py-1.5 rounded-lg text-center text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 transition-all cursor-pointer">
+                Online Kiosks
+              </button>
+            </div>
+
+            <!-- Live List Container -->
+            <div id="sidebar-activity-list" class="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+              <!-- Rendered dynamically by JavaScript -->
+              <div class="text-center py-6 text-xs text-slate-400">
+                <span>Loading recent activity...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Live Terminals ("Live Map" from Inspo) -->
+          <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-5 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="map-pin" class="w-4 h-4 text-[#FF5C7E]"></i>
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white">Live Kiosks Fleet</h3>
+              </div>
+              <button onclick="openKiosksModal()" class="text-[11px] font-semibold text-[#5D50A2] dark:text-purple-300 hover:underline">View Fleet</button>
+            </div>
+
+            <!-- Visual Kiosk Graphic -->
+            <div class="relative h-28 bg-gradient-to-br from-slate-100 to-purple-50 dark:from-slate-800/80 dark:to-[#1a2233] rounded-2xl overflow-hidden p-3 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+              <!-- Background Grid Elements -->
+              <div class="space-y-1">
+                <span class="text-[11px] font-bold text-slate-700 dark:text-white block">Connected Hardware</span>
+                <span id="sidebar-kiosks-status-text" class="text-[10px] text-slate-400 block">Universal Biometrics Active</span>
+                <div class="flex items-center space-x-1 mt-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Zero-Latency Sync</span>
+                </div>
+              </div>
+
+              <!-- Terminal Pulse Icon -->
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#5D50A2] to-[#FF5C7E] flex items-center justify-center text-white shadow-lg">
+                <i data-lucide="tablet" class="w-6 h-6"></i>
+              </div>
+            </div>
+          </div>
+
+        </aside>
+
       </div>
+
     </div>
+  </div>
 
-    <!-- VIEW 3: DAILY / MONTHLY ATTENDANCE SUMMARY -->
-    <div id="view-summary" class="hidden space-y-6">
-      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-6 shadow-sm dark:shadow-xl transition-colors">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Daily & Monthly Summary Report</h2>
-            <p class="text-xs text-slate-500 dark:text-gray-400">Track employee attendance rates, punctuality, and absence records</p>
-          </div>
+  <!-- ============================================================== -->
+  <!-- MODALS (MANUAL PUNCH, CONFIG, ENROLL, RESET, KIOSKS, DELETE) -->
+  <!-- ============================================================== -->
 
-          <div class="flex items-center space-x-3">
-            <input id="summary-date-picker" onchange="renderSummaryView()" type="date" class="bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
-            <button onclick="exportSummaryCSV()" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-200 border border-gray-300 dark:border-gray-700 flex items-center space-x-2 transition-all">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-              <span>Export Summary</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Summary Table -->
-        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-brand-border">
-          <table class="w-full text-left text-sm text-slate-700 dark:text-gray-300">
-            <thead class="bg-slate-50 dark:bg-[#0D121A] text-xs uppercase tracking-wider text-slate-500 dark:text-gray-400 border-b border-gray-200 dark:border-brand-border">
-              <tr>
-                <th class="py-3.5 px-4 font-semibold">Employee</th>
-                <th class="py-3.5 px-4 font-semibold">Department</th>
-                <th class="py-3.5 px-4 font-semibold">Punch Time</th>
-                <th class="py-3.5 px-4 font-semibold">Status</th>
-                <th class="py-3.5 px-4 font-semibold">Punctuality</th>
-                <th class="py-3.5 px-4 font-semibold">Days Present (This Month)</th>
-              </tr>
-            </thead>
-            <tbody id="summary-table-body" class="divide-y divide-gray-200 dark:divide-brand-border bg-white dark:bg-[#121822]">
-              <!-- Populated by JavaScript -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW 4: EMPLOYEES DIRECTORY -->
-    <div id="view-employees" class="hidden space-y-6">
-      <div class="bg-white dark:bg-[#141B26] border border-gray-200 dark:border-brand-border rounded-2xl p-6 shadow-sm dark:shadow-xl transition-colors">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Staff Roster</h2>
-            <p class="text-xs text-slate-500 dark:text-gray-400">Manage enrolled facial profiles and staff records</p>
-          </div>
-
-          <div class="flex items-center space-x-3">
-            <input id="search-employees" oninput="filterEmployees()" type="text" placeholder="Search employees..." class="bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700/80 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400 w-48 sm:w-64">
-            <button onclick="openAddEmployeeModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 dark:bg-cyan-400 text-white dark:text-black hover:bg-cyan-600 dark:hover:bg-cyan-300 flex items-center space-x-2 transition-all">
-              <i data-lucide="user-plus" class="w-4 h-4"></i>
-              <span>Enroll Employee</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Employees Grid -->
-        <div id="employees-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          <!-- Populated by JavaScript -->
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <!-- MANUAL PUNCH / CORRECTION MODAL -->
-  <div id="manual-punch-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#141B26] border border-green-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
+  <!-- 1. MANUAL PUNCH / CORRECTION MODAL -->
+  <div id="manual-punch-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center space-x-2.5">
-          <div class="p-2 bg-green-500/10 rounded-xl text-green-600 dark:text-green-400"><i data-lucide="user-check" class="w-5 h-5"></i></div>
-          <h3 class="text-lg font-bold text-slate-900 dark:text-white">Manual Attendance Correction</h3>
+          <div class="p-2 bg-emerald-500/10 rounded-xl text-emerald-600"><i data-lucide="user-check" class="w-5 h-5"></i></div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Manual Attendance Correction</h3>
         </div>
         <button onclick="closeManualPunchModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
-      <p class="text-xs text-slate-500 dark:text-gray-400 mb-4">
-        Record attendance for an employee who was offsite or missed gate scanning:
-      </p>
-
       <form onsubmit="handleManualPunch(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Select Employee *</label>
-          <select id="manual-emp-select" required class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
+          <select id="manual-emp-select" required class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
             <option value="">-- Choose Employee --</option>
           </select>
         </div>
@@ -639,34 +936,34 @@
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Date *</label>
-            <input id="manual-punch-date" type="date" required class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
+            <input id="manual-punch-date" type="date" required class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Time *</label>
-            <input id="manual-punch-time" type="time" required class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
+            <input id="manual-punch-time" type="time" required class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
           </div>
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">HR Note / Reason</label>
-          <input id="manual-punch-reason" type="text" placeholder="e.g. Offsite meeting, system downtime" class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
+          <input id="manual-punch-reason" type="text" placeholder="e.g. Offsite meeting, system downtime" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
         </div>
 
-        <div class="pt-3 flex justify-end space-x-3">
-          <button type="button" onclick="closeManualPunchModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800">Cancel</button>
-          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-green-500 text-white hover:bg-green-600">Submit Punch</button>
+        <div class="pt-2 flex justify-end space-x-2.5">
+          <button type="button" onclick="closeManualPunchModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-[#5D50A2] hover:bg-[#4E428D] text-white">Submit Punch</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- SUPABASE CONFIGURATION MODAL -->
-  <div id="config-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#141B26] border border-cyan-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
+  <!-- 2. SUPABASE CONFIGURATION MODAL -->
+  <div id="config-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center space-x-2.5">
-          <div class="p-2 bg-cyan-500/10 rounded-xl text-cyan-600 dark:text-cyan-400"><i data-lucide="database" class="w-5 h-5"></i></div>
-          <h3 class="text-lg font-bold text-slate-900 dark:text-white">Supabase API Configuration</h3>
+          <div class="p-2 bg-[#5D50A2]/15 rounded-xl text-[#5D50A2]"><i data-lucide="database" class="w-5 h-5"></i></div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Supabase Cloud Configuration</h3>
         </div>
         <button onclick="closeConfigModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
@@ -674,57 +971,57 @@
       <form onsubmit="handleSaveConfig(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1.5">Project URL</label>
-          <input id="config-url-input" type="url" required placeholder="https://xyzcompany.supabase.co" class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400 font-mono">
+          <input id="config-url-input" type="url" required placeholder="https://xyzcompany.supabase.co" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1.5">Anon / Publishable API Key</label>
-          <input id="config-key-input" type="password" required placeholder="eyJhbGciOi..." class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400 font-mono">
+          <input id="config-key-input" type="password" required placeholder="eyJhbGciOi..." class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
         </div>
 
-        <div class="pt-3 flex justify-end space-x-3">
-          <button type="button" onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-gray-800">Cancel</button>
-          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 dark:bg-cyan-400 text-white dark:text-black hover:bg-cyan-600 dark:hover:bg-cyan-300">Save & Connect</button>
+        <div class="pt-2 flex justify-end space-x-2.5">
+          <button type="button" onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-[#5D50A2] hover:bg-[#4E428D] text-white">Save & Connect</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- ADD / ENROLL EMPLOYEE MODAL (WITH WEBCAM BIOMETRIC CAPTURE) -->
-  <div id="add-employee-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#141B26] border border-cyan-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
+  <!-- 3. ADD / ENROLL EMPLOYEE MODAL (WEBCAM BIOMETRIC CAPTURE) -->
+  <div id="add-employee-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Enroll New Employee</h3>
+        <h3 class="text-base font-bold text-slate-900 dark:text-white">Enroll New Staff Member</h3>
         <button onclick="closeAddEmployeeModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
       <form onsubmit="handleCreateEmployee(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Full Name *</label>
-          <input id="new-emp-name" type="text" required placeholder="e.g. Sparsh Gaba" class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
+          <input id="new-emp-name" type="text" required placeholder="e.g. Sparsh Gaba" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Employee Code / ID</label>
-          <input id="new-emp-code" type="text" placeholder="e.g. EMP-101" class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
+          <input id="new-emp-code" type="text" placeholder="e.g. EMP-101" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Department</label>
-          <input id="new-emp-dept" type="text" placeholder="Engineering, Operations, etc." class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400">
+          <input id="new-emp-dept" type="text" placeholder="Engineering, Operations, HR..." class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#5D50A2]">
         </div>
 
         <!-- Webcam Face Capture for Universal Biometric Sync -->
-        <div class="border border-gray-200 dark:border-gray-800 rounded-2xl p-3 bg-slate-50 dark:bg-gray-900/50">
+        <div class="border border-slate-200 dark:border-slate-700 rounded-2xl p-3 bg-slate-50 dark:bg-slate-900/50">
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-2">Biometric Face Enrollment</label>
           
           <div id="enroll-cam-container" class="hidden mb-3">
-            <div class="relative w-full aspect-[4/3] max-w-[240px] mx-auto bg-black rounded-2xl overflow-hidden border border-cyan-400/40">
+            <div class="relative w-full aspect-[4/3] max-w-[220px] mx-auto bg-black rounded-2xl overflow-hidden border border-[#5D50A2]">
               <video id="enroll-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
               <canvas id="enroll-canvas" class="hidden"></canvas>
             </div>
             <div class="mt-2.5 flex justify-center space-x-2">
-              <button type="button" onclick="captureEnrollPhoto()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-green-500 text-white flex items-center space-x-1.5 shadow-md">
+              <button type="button" onclick="captureEnrollPhoto()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#FF5C7E] text-white flex items-center space-x-1 shadow-md">
                 <i data-lucide="camera" class="w-3.5 h-3.5"></i>
                 <span>Capture Face</span>
               </button>
@@ -733,84 +1030,141 @@
           </div>
 
           <div id="enroll-preview-container" class="flex items-center space-x-3">
-            <div id="enroll-avatar-preview" class="w-12 h-12 rounded-full bg-cyan-500/10 border-2 border-cyan-400/40 flex items-center justify-center text-cyan-500 font-bold text-sm overflow-hidden">
+            <div id="enroll-avatar-preview" class="w-12 h-12 rounded-full bg-[#5D50A2]/15 border-2 border-[#5D50A2]/30 flex items-center justify-center text-[#5D50A2] font-bold text-sm overflow-hidden">
               <i data-lucide="user" class="w-6 h-6"></i>
             </div>
             <div>
-              <button type="button" onclick="startEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 flex items-center space-x-1.5 transition-all">
+              <button type="button" onclick="startEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#5D50A2]/15 text-[#5D50A2] dark:text-purple-300 border border-[#5D50A2]/30 hover:bg-[#5D50A2]/25 flex items-center space-x-1.5 transition-all">
                 <i data-lucide="camera" class="w-3.5 h-3.5"></i>
                 <span id="enroll-btn-text">Take Photo with Webcam</span>
               </button>
-              <span id="enroll-status-text" class="text-[11px] text-slate-500 dark:text-gray-400 block mt-1">Optional, or register via Android Kiosk</span>
+              <span id="enroll-status-text" class="text-[11px] text-slate-400 block mt-1">Optional, or register via Android Kiosk</span>
             </div>
           </div>
         </div>
 
-        <div class="pt-3 flex justify-end space-x-3">
-          <button type="button" onclick="closeAddEmployeeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800">Cancel</button>
-          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-500 dark:bg-cyan-400 text-white dark:text-black hover:bg-cyan-600 dark:hover:bg-cyan-300">Enroll Employee</button>
+        <div class="pt-2 flex justify-end space-x-2.5">
+          <button type="button" onclick="closeAddEmployeeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-[#5D50A2] hover:bg-[#4E428D] text-white">Enroll Employee</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- RESET SYSTEM & DATA MODAL -->
-  <div id="reset-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#141B26] border border-red-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
+  <!-- 4. TOTAL SYSTEM RESET MODAL -->
+  <div id="reset-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#151B28] border border-rose-500/40 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center space-x-2.5">
-          <div class="p-2 bg-red-500/10 rounded-xl text-red-500"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
-          <h3 class="text-lg font-bold text-slate-900 dark:text-white">Universal Reset (All Devices)</h3>
+          <div class="p-2 bg-rose-500/10 rounded-xl text-rose-500"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Universal Data Reset</h3>
         </div>
         <button onclick="closeResetModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
       <p class="text-xs text-slate-600 dark:text-gray-300 leading-relaxed mb-4">
-        This action will permanently delete all attendance punches, logs, employee profiles, and biometric face data across both the Cloud database, all Android Kiosks, and Web dashboards.
+        This action will permanently delete all attendance logs, punches, and registered biometric facial profiles in this workspace across all devices.
       </p>
-
-      <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-600 dark:text-red-300 space-y-1 mb-4">
-        <div>• <b>attendance_logs</b> table will be emptied</div>
-        <div>• <b>employees</b> and facial embeddings will be wiped</div>
-        <div>• Android Kiosk local face models will clear automatically via live-sync</div>
-        <div>• This cannot be undone</div>
-      </div>
 
       <div class="space-y-3">
         <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300">
-          Type <span class="font-mono text-red-500 dark:text-red-400 font-bold">RESET</span> to confirm:
+          Type <span class="font-mono text-rose-500 font-bold">RESET</span> to confirm:
         </label>
-        <input id="reset-confirm-input" type="text" placeholder="RESET" class="w-full bg-slate-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white uppercase focus:outline-none focus:border-red-500">
+        <input id="reset-confirm-input" type="text" placeholder="RESET" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white uppercase focus:outline-none focus:border-rose-500">
 
-        <div class="pt-3 flex justify-end space-x-3">
-          <button type="button" onclick="closeResetModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800">Cancel</button>
-          <button type="button" id="reset-confirm-btn" onclick="executeTotalReset()" class="px-5 py-2 rounded-xl text-xs font-bold bg-red-500 text-white hover:bg-red-600 transition-all flex items-center space-x-1.5">
+        <div class="pt-2 flex justify-end space-x-2.5">
+          <button type="button" onclick="closeResetModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800">Cancel</button>
+          <button type="button" id="reset-confirm-btn" onclick="executeTotalReset()" class="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all flex items-center space-x-1.5">
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            <span>Confirm Total Reset</span>
+            <span>Confirm Reset</span>
           </button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- RLS Security Fix Modal (Shown if Supabase RLS silently blocks deletes) -->
-  <div id="rls-fix-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#141B26] border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
+  <!-- 5. DELETE ACCOUNT & WORKSPACE CONFIRMATION MODAL -->
+  <div id="delete-account-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#151B28] border border-rose-500/50 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-rose-500/10 rounded-xl text-rose-600"><i data-lucide="user-x" class="w-5 h-5"></i></div>
+          <h3 class="text-base font-bold text-rose-600 dark:text-rose-400">Permanently Delete Account?</h3>
+        </div>
+        <button onclick="closeDeleteAccountModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <p class="text-xs text-slate-600 dark:text-gray-300 leading-relaxed mb-4">
+        Are you absolutely sure? All employee facial data, kiosk registrations, and attendance history will be wiped immediately from Supabase Cloud.
+      </p>
+
+      <div class="space-y-3">
+        <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300">
+          Type <span class="font-mono text-rose-600 font-bold">DELETE</span> to confirm:
+        </label>
+        <input id="delete-account-confirm-input" type="text" placeholder="DELETE" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white uppercase focus:outline-none focus:border-rose-500">
+
+        <div class="pt-2 flex justify-end space-x-2.5">
+          <button type="button" onclick="closeDeleteAccountModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800">Cancel</button>
+          <button type="button" id="delete-account-btn" onclick="executeAccountDeletion()" class="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all flex items-center space-x-1.5">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Confirm Account Deletion</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. ACTIVE KIOSKS FLEET MODAL -->
+  <div id="kiosks-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-xl w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-[#5D50A2]/15 rounded-xl text-[#5D50A2]"><i data-lucide="smartphone" class="w-5 h-5"></i></div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white">Active Kiosks & Hardware</h3>
+            <p class="text-xs text-slate-400">Live terminals connected to your workspace</p>
+          </div>
+        </div>
+        <button onclick="closeKiosksModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="space-y-3 max-h-[50vh] overflow-y-auto pr-1" id="kiosks-list-container">
+        <!-- Rendered dynamically via app.js -->
+        <div class="text-center py-8 text-xs text-slate-400">
+          <i data-lucide="loader-2" class="w-5 h-5 mx-auto mb-2 animate-spin"></i>
+          <span>Checking active kiosk terminals...</span>
+        </div>
+      </div>
+
+      <div class="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <span class="flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Live WebSocket Heartbeat Active</span>
+        </span>
+        <button type="button" onclick="closeKiosksModal()" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-gray-300">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. RLS SECURITY FIX MODAL -->
+  <div id="rls-fix-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#151B28] border border-amber-500/40 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center space-x-2.5">
           <div class="p-2 bg-amber-500/10 rounded-xl text-amber-500"><i data-lucide="shield-alert" class="w-5 h-5"></i></div>
-          <h3 class="text-lg font-bold text-slate-900 dark:text-white">Supabase RLS Blocked Deletion</h3>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Supabase RLS Blocked Deletion</h3>
         </div>
         <button onclick="closeRlsFixModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
       <p class="text-xs text-slate-600 dark:text-gray-300 leading-relaxed mb-3">
-        Your online Supabase database has <b>Row Level Security (RLS)</b> active without a <code class="bg-slate-100 dark:bg-gray-800 px-1 py-0.5 rounded text-amber-600 dark:text-amber-400 font-mono">DELETE</code> policy for client apps. Supabase blocked the delete query, so the records remain on the server.
+        Row Level Security (RLS) blocked the delete query. Execute the SQL below in Supabase SQL Editor:
       </p>
 
       <div class="bg-slate-900 border border-gray-700 rounded-xl p-3.5 mb-4 relative">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-[11px] font-mono text-gray-400 font-semibold">1-Click SQL Fix (Supabase SQL Editor)</span>
+          <span class="text-[11px] font-mono text-gray-400 font-semibold">SQL Query</span>
           <button type="button" onclick="copyRlsSql()" id="copy-rls-btn" class="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-600 text-black text-[11px] font-bold flex items-center space-x-1">
             <i data-lucide="copy" class="w-3 h-3"></i>
             <span id="copy-rls-btn-text">Copy SQL</span>
@@ -820,51 +1174,12 @@
 ALTER TABLE public.employees DISABLE ROW LEVEL SECURITY;</pre>
       </div>
 
-      <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-700 dark:text-amber-300 space-y-1 mb-4">
-        <div><b>How to apply in 10 seconds:</b></div>
-        <div>1. Open your <b>Supabase Dashboard</b> → <b>SQL Editor</b>.</div>
-        <div>2. Click <b>New Query</b>, paste the 2 lines above, and click <b>Run</b>.</div>
-        <div>3. Return here and click <b>Execute Total Reset</b> again.</div>
-      </div>
-
-      <div class="flex justify-end space-x-3">
+      <div class="flex justify-end space-x-2.5">
         <a href="https://supabase.com/dashboard/project/nfgndrewxbvluruvrfhi/sql/new" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-black flex items-center space-x-1.5 transition-all">
           <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-          <span>Open Supabase SQL Editor</span>
+          <span>Open SQL Editor</span>
         </a>
-        <button type="button" onclick="closeRlsFixModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Active Kiosks Fleet Modal -->
-  <div id="kiosks-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#141B26] border border-blue-500/30 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center space-x-2.5">
-          <div class="p-2 bg-blue-500/10 rounded-xl text-blue-600 dark:text-blue-400"><i data-lucide="smartphone" class="w-5 h-5"></i></div>
-          <div>
-            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Active Kiosks & Hardware</h3>
-            <p class="text-xs text-slate-500 dark:text-gray-400">Live terminals connected to your workspace</p>
-          </div>
-        </div>
-        <button onclick="closeKiosksModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-
-      <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1" id="kiosks-list-container">
-        <!-- Rendered dynamically via app.js -->
-        <div class="text-center py-8 text-xs text-slate-400 dark:text-gray-500">
-          <i data-lucide="loader-2" class="w-5 h-5 mx-auto mb-2 animate-spin"></i>
-          <span>Checking active kiosk terminals...</span>
-        </div>
-      </div>
-
-      <div class="mt-5 pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-xs text-slate-500 dark:text-gray-400">
-        <span class="flex items-center space-x-1.5">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Live WebSocket Heartbeat Active</span>
-        </span>
-        <button type="button" onclick="closeKiosksModal()" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 text-slate-700 dark:text-gray-300">Close</button>
+        <button type="button" onclick="closeRlsFixModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800">Close</button>
       </div>
     </div>
   </div>

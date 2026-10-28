@@ -97,6 +97,14 @@ window.handleSignupStep1Submit = handleSignupStep1Submit;
 window.handleSignupStep2Submit = handleSignupStep2Submit;
 window.handleSignupStep3Submit = handleSignupStep3Submit;
 window.resendOtpCode = resendOtpCode;
+window.switchTab = switchTab;
+window.switchSidebarTab = switchSidebarTab;
+window.handleSaveAccountProfile = handleSaveAccountProfile;
+window.handleUpdatePassword = handleUpdatePassword;
+window.openDeleteAccountModal = openDeleteAccountModal;
+window.closeDeleteAccountModal = closeDeleteAccountModal;
+window.executeAccountDeletion = executeAccountDeletion;
+window.handleGlobalSearch = handleGlobalSearch;
 
 // ==============================================================
 // Theme Toggle (Light / Dark Theme)
@@ -180,17 +188,27 @@ function handleAuthSuccess(user) {
   // Display user/workspace identifier in the header
   const userBadge = document.getElementById('user-profile-badge');
   const userText = document.getElementById('tenant-display-name');
+  const avatarInitial = document.getElementById('tenant-avatar-initial');
   if (userText) {
-    const email = user.email || 'Workspace';
-    userText.innerText = email.length > 22 ? email.slice(0, 20) + '...' : email;
+    const meta = user.user_metadata || {};
+    const name = meta.company_name || meta.full_name || user.email || 'Workspace';
+    userText.innerText = name.length > 20 ? name.slice(0, 18) + '...' : name;
+  }
+  if (avatarInitial) {
+    const meta = user.user_metadata || {};
+    const letter = (meta.company_name || meta.full_name || user.email || 'A')[0].toUpperCase();
+    avatarInitial.innerText = letter;
   }
   if (userBadge) userBadge.classList.remove('hidden');
+
+  populateAccountTab();
 
   // Load tenant-isolated data
   fetchEmployees();
   fetchAttendanceLogs();
   fetchActiveKiosks();
   subscribeToUniversalRealtime();
+  switchTab('dashboard');
 }
 
 async function handleUserLogout() {
@@ -863,53 +881,461 @@ function closeKiosksModal() {
 }
 
 // ==============================================================
-// Switch Navigation Tabs ('live' | 'scanner' | 'summary' | 'employees')
+// Navigation & Tab Controller ('dashboard' | 'live' | 'scanner' | 'summary' | 'employees' | 'account')
 // ==============================================================
+let activeNavTab = 'dashboard';
+let activeSidebarTab = 'act';
+
 function switchTab(tab) {
-  const liveView = document.getElementById('view-live');
-  const scannerView = document.getElementById('view-scanner');
-  const summaryView = document.getElementById('view-summary');
-  const employeesView = document.getElementById('view-employees');
+  activeNavTab = tab;
 
-  const liveBtn = document.getElementById('tab-live-btn');
-  const scannerBtn = document.getElementById('tab-scanner-btn');
-  const summaryBtn = document.getElementById('tab-summary-btn');
-  const employeesBtn = document.getElementById('tab-employees-btn');
+  const views = {
+    dashboard: document.getElementById('view-dashboard'),
+    live: document.getElementById('view-live'),
+    scanner: document.getElementById('view-scanner'),
+    summary: document.getElementById('view-summary'),
+    employees: document.getElementById('view-employees'),
+    account: document.getElementById('view-account'),
+  };
 
-  const activeBtnClass = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 transition-all flex items-center space-x-2';
-  const inactiveBtnClass = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center space-x-2';
+  const dockTabs = {
+    dashboard: document.getElementById('dock-tab-dashboard'),
+    live: document.getElementById('dock-tab-live'),
+    scanner: document.getElementById('dock-tab-scanner'),
+    summary: document.getElementById('dock-tab-summary'),
+    employees: document.getElementById('dock-tab-employees'),
+    account: document.getElementById('dock-tab-account'),
+  };
 
-  // Reset all views
-  liveView.classList.add('hidden');
-  scannerView.classList.add('hidden');
-  summaryView.classList.add('hidden');
-  employeesView.classList.add('hidden');
+  const titles = {
+    dashboard: 'Dashboard',
+    live: 'Live Attendance Stream',
+    scanner: 'Webcam Face Scanner Kiosk',
+    summary: 'Attendance Reports & Summary',
+    employees: 'Staff & Biometric Roster',
+    account: 'Account & Workspace Settings'
+  };
 
-  liveBtn.className = inactiveBtnClass;
-  scannerBtn.className = inactiveBtnClass;
-  summaryBtn.className = inactiveBtnClass;
-  employeesBtn.className = inactiveBtnClass;
+  const titleEl = document.getElementById('page-title');
+  if (titleEl && titles[tab]) {
+    titleEl.textContent = titles[tab];
+  }
 
-  if (tab === 'live') {
-    liveView.classList.remove('hidden');
-    liveBtn.className = activeBtnClass;
-    stopWebScanner();
-  } else if (tab === 'scanner') {
-    scannerView.classList.remove('hidden');
-    scannerBtn.className = activeBtnClass;
+  // Active / Inactive dock tab button classes
+  const activeClass = 'w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white text-[#5D50A2] shadow-lg shadow-black/10 flex items-center justify-center cursor-pointer transition-all';
+  const inactiveClass = 'w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all';
+
+  // Toggle views
+  Object.keys(views).forEach(key => {
+    if (views[key]) {
+      if (key === tab) {
+        views[key].classList.remove('hidden');
+      } else {
+        views[key].classList.add('hidden');
+      }
+    }
+  });
+
+  // Toggle dock icons
+  Object.keys(dockTabs).forEach(key => {
+    if (dockTabs[key]) {
+      dockTabs[key].className = (key === tab) ? activeClass : inactiveClass;
+    }
+  });
+
+  if (tab === 'scanner') {
     startWebScanner();
-  } else if (tab === 'summary') {
-    summaryView.classList.remove('hidden');
-    summaryBtn.className = activeBtnClass;
-    stopWebScanner();
-    renderSummaryView();
-  } else if (tab === 'employees') {
-    employeesView.classList.remove('hidden');
-    employeesBtn.className = activeBtnClass;
+  } else {
     stopWebScanner();
   }
 
+  if (tab === 'dashboard') {
+    updateDashboardMetrics();
+  } else if (tab === 'summary') {
+    renderSummaryView();
+  } else if (tab === 'account') {
+    populateAccountTab();
+  }
+
   safeCreateIcons();
+}
+
+// Update Overview Dashboard Metrics (Hero Curve, Middle 2 Cards, Bottom 3 Cards)
+function updateDashboardMetrics() {
+  const totalStaff = employeesList.length;
+  const todayStr = new Date().toDateString();
+  const todayLogs = attendanceLogs.filter(log => new Date(log.created_at).toDateString() === todayStr);
+
+  const heroPunches = document.getElementById('hero-total-punches');
+  if (heroPunches) heroPunches.textContent = `${todayLogs.length} Punches`;
+
+  const heroStaff = document.getElementById('hero-total-staff');
+  if (heroStaff) heroStaff.textContent = `${totalStaff} Staff`;
+
+  // Punched unique employees today
+  const punchedSet = new Set();
+  let lateCount = 0;
+  todayLogs.forEach(log => {
+    const empKey = (log.employee_name || log.employee_id || '').trim().toLowerCase();
+    if (empKey && !punchedSet.has(empKey)) {
+      punchedSet.add(empKey);
+      if (isPunchLate(new Date(log.created_at))) lateCount++;
+    }
+  });
+
+  const presentCount = punchedSet.size;
+  const onTimeCount = Math.max(0, presentCount - lateCount);
+  const onTimeRate = presentCount > 0 ? Math.round((onTimeCount / presentCount) * 100) : 98;
+
+  const heroRate = document.getElementById('hero-ontime-rate');
+  if (heroRate) heroRate.textContent = `${onTimeRate}%`;
+
+  const waveBadge = document.getElementById('hero-wave-badge');
+  if (waveBadge) waveBadge.textContent = `${todayLogs.length} Punches Today`;
+
+  const dashKiosks = document.getElementById('dash-kiosks-count');
+  if (dashKiosks) dashKiosks.textContent = activeKiosksList.length;
+
+  const dashTodayPunches = document.getElementById('dash-today-punches');
+  if (dashTodayPunches) dashTodayPunches.textContent = todayLogs.length;
+
+  const statSynced = document.getElementById('stat-synced-faces');
+  if (statSynced) statSynced.textContent = totalStaff;
+
+  const statSyncedBar = document.getElementById('stat-synced-bar');
+  if (statSyncedBar) statSyncedBar.style.width = '100%';
+
+  const statPunctualBar = document.getElementById('stat-punctual-bar');
+  if (statPunctualBar) statPunctualBar.style.width = `${onTimeRate}%`;
+
+  const lateMetric = document.getElementById('metric-late-today');
+  if (lateMetric) lateMetric.textContent = lateCount;
+
+  renderSidebarActivity();
+}
+
+// Right Sidebar Activity / Kiosks Switcher
+function switchSidebarTab(tab) {
+  activeSidebarTab = tab;
+  const btnAct = document.getElementById('sidebar-tab-act');
+  const btnKiosks = document.getElementById('sidebar-tab-kiosks');
+
+  if (tab === 'act') {
+    if (btnAct) btnAct.className = 'py-1.5 rounded-lg text-center bg-[#5D50A2] text-white font-semibold shadow-sm transition-all cursor-pointer';
+    if (btnKiosks) btnKiosks.className = 'py-1.5 rounded-lg text-center text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 transition-all cursor-pointer';
+  } else {
+    if (btnKiosks) btnKiosks.className = 'py-1.5 rounded-lg text-center bg-[#5D50A2] text-white font-semibold shadow-sm transition-all cursor-pointer';
+    if (btnAct) btnAct.className = 'py-1.5 rounded-lg text-center text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 transition-all cursor-pointer';
+  }
+
+  renderSidebarActivity();
+  safeCreateIcons();
+}
+
+function renderSidebarActivity() {
+  const container = document.getElementById('sidebar-activity-list');
+  if (!container) return;
+
+  if (activeSidebarTab === 'act') {
+    if (!attendanceLogs || attendanceLogs.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-6 text-xs text-slate-400">
+          <i data-lucide="clock" class="w-5 h-5 mx-auto mb-1.5 text-purple-300"></i>
+          <span>No punches recorded yet</span>
+        </div>`;
+      safeCreateIcons();
+      return;
+    }
+
+    const recent = attendanceLogs.slice(0, 8);
+    container.innerHTML = recent.map(log => {
+      const name = escapeHtml(log.employee_name || 'Staff');
+      const time = formatLocalTime(log.created_at);
+      const isLate = isPunchLate(new Date(log.created_at));
+      const device = escapeHtml(log.device_name || 'Kiosk');
+      const initial = name[0] ? name[0].toUpperCase() : 'S';
+
+      return `
+        <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-purple-50/50 dark:hover:bg-slate-800 transition-colors">
+          <div class="flex items-center space-x-3 min-w-0">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-[#5D50A2] to-[#FF5C7E] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+              ${initial}
+            </div>
+            <div class="min-w-0">
+              <div class="font-bold text-xs text-slate-800 dark:text-white truncate">${name}</div>
+              <div class="text-[11px] text-slate-400 truncate">${device} • ${time}</div>
+            </div>
+          </div>
+          <div class="shrink-0 pl-2">
+            <span class="w-7 h-7 rounded-full ${isLate ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'} flex items-center justify-center">
+              <i data-lucide="${isLate ? 'clock' : 'check'}" class="w-3.5 h-3.5"></i>
+            </span>
+          </div>
+        </div>`;
+    }).join('');
+  } else {
+    // Render Kiosks in sidebar
+    if (!activeKiosksList || activeKiosksList.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-6 text-xs text-slate-400">
+          <i data-lucide="smartphone" class="w-5 h-5 mx-auto mb-1.5 text-purple-300"></i>
+          <span>No hardware kiosks registered</span>
+        </div>`;
+      safeCreateIcons();
+      return;
+    }
+
+    container.innerHTML = activeKiosksList.map(k => {
+      const name = escapeHtml(k.device_name || 'Android Kiosk');
+      const ip = escapeHtml(k.ip_address || 'Cloud Link');
+      const active = isKioskHeartbeatActive(k);
+
+      return `
+        <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-purple-50/50 dark:hover:bg-slate-800 transition-colors">
+          <div class="flex items-center space-x-3 min-w-0">
+            <div class="w-9 h-9 rounded-2xl bg-[#5D50A2]/15 text-[#5D50A2] dark:text-purple-300 flex items-center justify-center shrink-0">
+              <i data-lucide="tablet" class="w-4 h-4"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="font-bold text-xs text-slate-800 dark:text-white truncate">${name}</div>
+              <div class="text-[11px] text-slate-400 truncate">${ip}</div>
+            </div>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}">
+            ${active ? 'Online' : 'Standby'}
+          </span>
+        </div>`;
+    }).join('');
+  }
+
+  safeCreateIcons();
+}
+
+// ==============================================================
+// Account Tab & Workspace Management (Sync with Supabase)
+// ==============================================================
+function populateAccountTab() {
+  if (!currentAuthUser) return;
+  const meta = currentAuthUser.user_metadata || {};
+
+  const nameInput = document.getElementById('account-fullname');
+  if (nameInput) nameInput.value = meta.full_name || '';
+
+  const compInput = document.getElementById('account-company');
+  if (compInput) compInput.value = meta.company_name || localStorage.getItem('tenant_company_name') || '';
+
+  const emailInput = document.getElementById('account-email');
+  if (emailInput) emailInput.value = currentAuthUser.email || '';
+
+  const uidInput = document.getElementById('account-uid');
+  if (uidInput) uidInput.value = currentAuthUser.id || '';
+}
+
+async function handleSaveAccountProfile(e) {
+  e.preventDefault();
+  if (!supabaseClient || !currentAuthUser) return;
+
+  const btn = document.getElementById('account-save-profile-btn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span>Saving...</span>';
+
+  const fullName = document.getElementById('account-fullname').value.trim();
+  const companyName = document.getElementById('account-company').value.trim();
+
+  try {
+    const { data, error } = await supabaseClient.auth.updateUser({
+      data: {
+        full_name: fullName,
+        company_name: companyName
+      }
+    });
+
+    if (error) throw error;
+    if (data && data.user) {
+      currentAuthUser = data.user;
+    }
+
+    if (companyName) {
+      localStorage.setItem('tenant_company_name', companyName);
+    }
+
+    // Update display in header
+    const displayNameEl = document.getElementById('tenant-display-name');
+    if (displayNameEl) {
+      const display = companyName || fullName || currentAuthUser.email;
+      displayNameEl.innerText = display.length > 20 ? display.slice(0, 18) + '...' : display;
+    }
+    const avatarInitial = document.getElementById('tenant-avatar-initial');
+    if (avatarInitial) {
+      avatarInitial.innerText = (fullName || companyName || currentAuthUser.email || 'A')[0].toUpperCase();
+    }
+
+    alert('Workspace profile updated successfully!');
+  } catch (err) {
+    console.error('Save Profile Error:', err);
+    alert('Failed to update workspace profile: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    safeCreateIcons();
+  }
+}
+
+async function handleUpdatePassword(e) {
+  e.preventDefault();
+  if (!supabaseClient) return;
+
+  const newPass = document.getElementById('account-new-password').value;
+  const confPass = document.getElementById('account-confirm-password').value;
+
+  if (newPass.length < 6) {
+    alert('Password must be at least 6 characters long.');
+    return;
+  }
+  if (newPass !== confPass) {
+    alert('Passwords do not match. Please re-enter.');
+    return;
+  }
+
+  const btn = document.getElementById('account-update-password-btn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span>Updating...</span>';
+
+  try {
+    const { data, error } = await supabaseClient.auth.updateUser({
+      password: newPass
+    });
+
+    if (error) throw error;
+    document.getElementById('account-new-password').value = '';
+    document.getElementById('account-confirm-password').value = '';
+    alert('Password updated successfully!');
+  } catch (err) {
+    console.error('Password Update Error:', err);
+    alert('Failed to update password: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    safeCreateIcons();
+  }
+}
+
+function openDeleteAccountModal() {
+  const modal = document.getElementById('delete-account-modal');
+  if (modal) {
+    document.getElementById('delete-account-confirm-input').value = '';
+    modal.classList.remove('hidden');
+  }
+  safeCreateIcons();
+}
+
+function closeDeleteAccountModal() {
+  const modal = document.getElementById('delete-account-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function executeAccountDeletion() {
+  const input = document.getElementById('delete-account-confirm-input');
+  if (!input || input.value.trim().toUpperCase() !== 'DELETE') {
+    alert('Please type DELETE in capital letters to confirm account deletion.');
+    return;
+  }
+
+  if (!supabaseClient || !currentAuthUser) return;
+
+  const btn = document.getElementById('delete-account-btn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span>Deleting Account & Data...</span>';
+
+  try {
+    const userId = currentAuthUser.id;
+
+    // 1. Delete all attendance logs for this user/tenant
+    try {
+      await supabaseClient.from('attendance_logs').delete().eq('user_id', userId);
+    } catch (e) {
+      console.warn('Attendance logs delete error:', e.message);
+    }
+
+    // 2. Delete all employees and facial profiles for this user/tenant
+    try {
+      await supabaseClient.from('employees').delete().eq('user_id', userId);
+    } catch (e) {
+      console.warn('Employees delete error:', e.message);
+    }
+
+    // 3. Delete all kiosks for this user/tenant
+    try {
+      await supabaseClient.from('kiosks').delete().eq('user_id', userId);
+    } catch (e) {
+      console.warn('Kiosks delete error:', e.message);
+    }
+
+    // 4. Sign out
+    await supabaseClient.auth.signOut();
+
+    // 5. Clear all local tenant state
+    currentAuthUser = null;
+    employeesList = [];
+    attendanceLogs = [];
+    activeKiosksList = [];
+    localStorage.removeItem('tenant_company_name');
+
+    closeDeleteAccountModal();
+    renderEmployees([]);
+    renderAttendanceLogs([]);
+    updateDashboardMetrics();
+    showAuthOverlay();
+    showAuthAlert('Your workspace account and all biometric facial data have been permanently erased.', 'success');
+  } catch (err) {
+    console.error('Account Deletion Error:', err);
+    alert('Account deletion encountered an issue: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    safeCreateIcons();
+  }
+}
+
+// Global Header Search Controller
+function handleGlobalSearch(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (activeNavTab === 'employees') {
+    const searchInput = document.getElementById('search-employees');
+    if (searchInput) {
+      searchInput.value = query;
+      filterEmployees();
+    }
+  } else if (activeNavTab === 'live') {
+    const searchInput = document.getElementById('search-attendance');
+    if (searchInput) {
+      searchInput.value = query;
+      filterAttendanceLogs();
+    }
+  } else {
+    // Filter sidebar list
+    if (activeSidebarTab === 'act') {
+      const filtered = attendanceLogs.filter(log => (log.employee_name || '').toLowerCase().includes(q));
+      const container = document.getElementById('sidebar-activity-list');
+      if (container && q) {
+        if (filtered.length === 0) {
+          container.innerHTML = '<div class="text-center py-6 text-xs text-slate-400">No matching activity found</div>';
+        } else {
+          container.innerHTML = filtered.slice(0, 8).map(log => `
+            <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60">
+              <div class="font-bold text-xs text-slate-800 dark:text-white truncate">${escapeHtml(log.employee_name)}</div>
+              <div class="text-[11px] text-slate-400">${formatLocalTime(log.created_at)}</div>
+            </div>
+          `).join('');
+        }
+      } else {
+        renderSidebarActivity();
+      }
+    }
+  }
 }
 
 // ==============================================================
@@ -1314,6 +1740,9 @@ function updateMetrics() {
   if (presentEl) presentEl.textContent = presentCount;
   if (absentEl) absentEl.textContent = absentCount;
   if (lateEl) lateEl.textContent = lateCount;
+
+  // Also update Overview Dashboard and Sidebar Activity
+  updateDashboardMetrics();
 }
 
 // Show Realtime Pop Notification
