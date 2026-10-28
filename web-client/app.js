@@ -174,6 +174,7 @@ function showAuthOverlay() {
     auth.classList.remove('hidden');
     switchAuthMode('login');
   }
+  document.body.className = 'bg-[#1F62D1] min-h-screen font-sans antialiased transition-colors duration-200 flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8';
 }
 
 function hideAuthOverlay() {
@@ -181,6 +182,7 @@ function hideAuthOverlay() {
   const main = document.getElementById('main-app-container');
   if (auth) auth.classList.add('hidden');
   if (main) main.classList.remove('hidden');
+  document.body.className = 'bg-[#E5E9F2] dark:bg-[#0B0F17] text-slate-800 dark:text-gray-100 min-h-screen font-sans antialiased transition-colors duration-200 p-2 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center';
 }
 
 function handleAuthSuccess(user) {
@@ -240,27 +242,24 @@ function switchAuthMode(mode) {
   authMode = mode;
   hideAuthAlert();
 
-  const tabLogin = document.getElementById('tab-btn-login');
-  const tabSignup = document.getElementById('tab-btn-signup');
   const viewLogin = document.getElementById('auth-view-login');
   const viewSignup1 = document.getElementById('auth-view-signup-1');
   const viewSignup2 = document.getElementById('auth-view-signup-2');
   const viewSignup3 = document.getElementById('auth-view-signup-3');
-
-  const activePill = 'py-2 rounded-lg text-center transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm cursor-pointer font-semibold';
-  const inactivePill = 'py-2 rounded-lg text-center transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer font-medium';
+  const titleEl = document.getElementById('auth-form-title');
+  const subtitleEl = document.getElementById('auth-form-subtitle');
 
   if (mode === 'login') {
-    if (tabLogin) tabLogin.className = activePill;
-    if (tabSignup) tabSignup.className = inactivePill;
+    if (titleEl) titleEl.textContent = 'Sign in';
+    if (subtitleEl) subtitleEl.textContent = 'Enter your credentials to access your workspace';
 
     if (viewLogin) viewLogin.classList.remove('hidden');
     if (viewSignup1) viewSignup1.classList.add('hidden');
     if (viewSignup2) viewSignup2.classList.add('hidden');
     if (viewSignup3) viewSignup3.classList.add('hidden');
   } else {
-    if (tabSignup) tabSignup.className = activePill;
-    if (tabLogin) tabLogin.className = inactivePill;
+    if (titleEl) titleEl.textContent = 'Create Account';
+    if (subtitleEl) subtitleEl.textContent = 'Set up your A10D workspace in 3 quick steps';
 
     goToSignupStep(1);
   }
@@ -275,6 +274,8 @@ function goToSignupStep(step) {
   const viewSignup1 = document.getElementById('auth-view-signup-1');
   const viewSignup2 = document.getElementById('auth-view-signup-2');
   const viewSignup3 = document.getElementById('auth-view-signup-3');
+  const titleEl = document.getElementById('auth-form-title');
+  const subtitleEl = document.getElementById('auth-form-subtitle');
 
   if (viewLogin) viewLogin.classList.add('hidden');
   if (viewSignup1) viewSignup1.classList.add('hidden');
@@ -282,8 +283,12 @@ function goToSignupStep(step) {
   if (viewSignup3) viewSignup3.classList.add('hidden');
 
   if (step === 1) {
+    if (titleEl) titleEl.textContent = 'Create Account';
+    if (subtitleEl) subtitleEl.textContent = 'Step 1 of 3: Enter your organization email';
     if (viewSignup1) viewSignup1.classList.remove('hidden');
   } else if (step === 2) {
+    if (titleEl) titleEl.textContent = 'Verify Code';
+    if (subtitleEl) subtitleEl.textContent = 'Step 2 of 3: Enter the OTP sent to your email';
     if (viewSignup2) viewSignup2.classList.remove('hidden');
     const emailDisp = document.getElementById('otp-target-email');
     if (emailDisp) emailDisp.innerText = pendingSignupEmail;
@@ -291,6 +296,8 @@ function goToSignupStep(step) {
     focusFirstOtpBox();
     startResendCountdown();
   } else if (step === 3) {
+    if (titleEl) titleEl.textContent = 'Create Password';
+    if (subtitleEl) subtitleEl.textContent = 'Step 3 of 3: Secure your administrator account';
     if (viewSignup3) viewSignup3.classList.remove('hidden');
   }
   safeCreateIcons();
@@ -315,23 +322,42 @@ function appendDomain(domain) {
   input.focus();
 }
 
-// Toggle password text visibility
-function togglePasswordVisibility(inputId, iconId) {
+// Toggle password text visibility (supports both text button "SHOW"/"HIDE" and SVG icon)
+function togglePasswordVisibility(inputId, trigger) {
   const input = document.getElementById(inputId);
-  const icon = document.getElementById(iconId);
+  const el = typeof trigger === 'string' ? document.getElementById(trigger) : trigger;
   if (!input) return;
   if (input.type === 'password') {
     input.type = 'text';
-    if (icon) {
-      icon.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`;
+    if (el) {
+      if (el.tagName === 'BUTTON' || el.tagName === 'SPAN') {
+        el.textContent = 'HIDE';
+      } else {
+        el.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`;
+      }
     }
   } else {
     input.type = 'password';
-    if (icon) {
-      icon.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    if (el) {
+      if (el.tagName === 'BUTTON' || el.tagName === 'SPAN') {
+        el.textContent = 'SHOW';
+      } else {
+        el.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+      }
     }
   }
 }
+
+function quickFillDemoWorkspace() {
+  const email = document.getElementById('login-email');
+  const pass = document.getElementById('login-password');
+  if (email && pass) {
+    email.value = 'admin@a10d.ai';
+    pass.value = 'admin1234';
+    showAuthAlert('Demo credentials filled. Click "Sign in" to test.', 'success');
+  }
+}
+window.quickFillDemoWorkspace = quickFillDemoWorkspace;
 
 // Alert banner inside auth card
 function showAuthAlert(msg, type = 'error') {

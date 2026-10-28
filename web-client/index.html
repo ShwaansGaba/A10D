@@ -54,222 +54,311 @@
     ::-webkit-scrollbar-thumb:hover {
       background: rgba(93, 80, 162, 0.4);
     }
+    /* Photorealistic 3D Spheres matching reference login design */
+    .sphere-3d-main {
+      background: radial-gradient(circle at 35% 30%, #68aeff 0%, #2974f0 32%, #1952be 65%, #0d2f78 100%);
+      box-shadow: 0 20px 45px rgba(10, 35, 90, 0.42), inset -8px -8px 20px rgba(5, 18, 50, 0.5), inset 6px 6px 14px rgba(255, 255, 255, 0.45);
+    }
+    .sphere-3d-left {
+      background: radial-gradient(circle at 35% 30%, #5ba4ff 0%, #1e62dc 35%, #1244a0 70%, #09245a 100%);
+      box-shadow: 0 15px 35px rgba(10, 35, 90, 0.38), inset -6px -6px 16px rgba(5, 18, 50, 0.45), inset 4px 4px 10px rgba(255, 255, 255, 0.35);
+    }
+    .sphere-3d-corner {
+      background: radial-gradient(circle at 35% 30%, #68aeff 0%, #2974f0 35%, #1a56c4 70%, #0d327d 100%);
+      box-shadow: 0 15px 35px rgba(10, 35, 90, 0.25), inset -6px -6px 15px rgba(5, 18, 50, 0.35), inset 4px 4px 10px rgba(255, 255, 255, 0.35);
+    }
   </style>
 </head>
-<body class="bg-[#E5E9F2] dark:bg-[#0B0F17] text-slate-800 dark:text-gray-100 min-h-screen font-sans antialiased transition-colors duration-200 p-2 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center">
+<body class="bg-[#1F62D1] min-h-screen font-sans antialiased transition-colors duration-200 flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8">
 
   <!-- ============================================================== -->
-  <!-- 1. STANDALONE LOGIN & SIGN UP PAGE (SEPARATE FROM DASHBOARD) -->
+  <!-- 1. STANDALONE LOGIN & SIGN UP PAGE (HEAVILY INSPIRED BY REFERENCE) -->
   <!-- ============================================================== -->
-  <div id="auth-container" class="w-full min-h-screen flex items-center justify-center p-4 sm:p-6">
-    <div id="auth-card" class="bg-white dark:bg-[#121824] border border-slate-200/80 dark:border-slate-800 rounded-3xl w-full max-w-[440px] shadow-2xl relative p-6 sm:p-8 my-auto transition-all">
+  <div id="auth-container" class="w-full min-h-screen flex items-center justify-center p-2 sm:p-4 md:p-8 select-none">
+    <div id="auth-card" class="bg-white dark:bg-[#151B28] rounded-[28px] sm:rounded-[36px] w-full max-w-[960px] shadow-[0_30px_90px_rgba(10,35,90,0.38)] relative overflow-hidden flex flex-col md:flex-row transition-all my-auto">
       
-      <!-- Brand Logo & Header: A10D -->
-      <div class="text-center mb-6">
-        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#5D50A2] to-[#FF5C7E] flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-[#5D50A2]/20">
-          <svg class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
-            <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
-            <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
-            <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-            <circle cx="9" cy="10" r="1.2" fill="currentColor"/>
-            <circle cx="15" cy="10" r="1.2" fill="currentColor"/>
-            <path d="M9.5 15a3.5 3.5 0 0 0 5 0"/>
-          </svg>
-        </div>
-        <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-wider">A10D</h1>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Biometric Attendance & Kiosk Fleet OS</p>
-      </div>
+      <!-- Left Welcome Panel (Matching Reference Image) -->
+      <div class="w-full md:w-[48%] relative bg-gradient-to-br from-[#1E57C3] via-[#1A4EB5] to-[#123B91] p-8 sm:p-10 lg:p-12 flex flex-col justify-between overflow-hidden text-white min-h-[320px] md:min-h-[580px] shrink-0">
+        
+        <!-- Curved backdrop overlay / light effects -->
+        <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-blue-400/20 blur-3xl pointer-events-none"></div>
+        <div class="absolute top-1/2 -right-20 w-80 h-80 rounded-full bg-[#1F62D1]/40 blur-2xl pointer-events-none"></div>
 
-      <!-- Segmented Switcher (Sign In vs Create Account) -->
-      <div class="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl mb-6 text-xs select-none">
-        <button type="button" id="tab-btn-login" onclick="switchAuthMode('login')" class="py-2 rounded-lg text-center transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm cursor-pointer font-semibold">
-          Sign In
-        </button>
-        <button type="button" id="tab-btn-signup" onclick="switchAuthMode('signup')" class="py-2 rounded-lg text-center transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer font-medium">
-          Create Account
-        </button>
-      </div>
+        <!-- Layered 3D Spheres matching reference image -->
+        <!-- Large sphere sitting in the center-bottom / transition zone -->
+        <div class="sphere-3d-main w-44 h-44 sm:w-56 sm:h-56 rounded-full absolute -bottom-10 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-24 z-10 transition-transform duration-300 hover:scale-105"></div>
+        <!-- Overlapping sphere in bottom-left -->
+        <div class="sphere-3d-left w-32 h-32 sm:w-40 sm:h-40 rounded-full absolute -bottom-10 -left-10 z-0 opacity-95 transition-transform duration-300 hover:scale-105"></div>
 
-      <!-- Live Error / Success Notification Alert Box -->
-      <div id="auth-alert-box" class="hidden mb-4 p-3 rounded-xl text-xs font-medium flex items-start space-x-2.5">
-        <span id="auth-alert-icon" class="shrink-0 mt-0.5"></span>
-        <span id="auth-alert-text" class="flex-1 leading-relaxed"></span>
-      </div>
-
-      <!-- VIEW 1: SIGN IN FORM -->
-      <div id="auth-view-login" class="space-y-4">
-        <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Work Email</label>
-            <input id="login-email" type="email" required autocomplete="email" placeholder="name@company.com" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
+        <!-- Typography & Brand Info -->
+        <div class="relative z-20">
+          <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 w-max mb-6 shadow-sm">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-[11px] font-bold tracking-wider uppercase text-blue-100">A10D Fleet OS</span>
           </div>
 
-          <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
-            <input id="login-password" type="password" required autocomplete="current-password" placeholder="••••••••" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
-          </div>
-
-          <div class="pt-1">
-            <button type="submit" id="login-btn" class="w-full h-11 bg-[#5D50A2] hover:bg-[#4E428D] active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#5D50A2]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
-              <span>Sign In to A10D</span>
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-              </svg>
-            </button>
-          </div>
-        </form>
-
-        <div class="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
-          New company or organization? 
-          <button type="button" id="link-goto-signup" onclick="switchAuthMode('signup')" class="text-[#5D50A2] dark:text-purple-300 font-semibold hover:underline cursor-pointer ml-1">Sign up here</button>
-        </div>
-      </div>
-
-      <!-- VIEW 2: SIGN UP - STEP 1 (EMAIL ENTRY) -->
-      <div id="auth-view-signup-1" class="space-y-4 hidden">
-        <div class="mb-2">
-          <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-            <span class="font-medium text-slate-700 dark:text-slate-300">Step 1 of 3</span>
-            <span>Work Email</span>
-          </div>
-          <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-[#5D50A2] h-full w-1/3 rounded-full transition-all duration-300"></div>
-          </div>
-        </div>
-
-        <form onsubmit="handleSignupStep1Submit(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Your Work Email</label>
-            <input id="signup-email" type="email" required autocomplete="email" placeholder="admin@yourcompany.com" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Company / Workspace Name (Optional)</label>
-            <input id="signup-company" type="text" placeholder="Acme Inc." class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
-          </div>
-
-          <div class="pt-1">
-            <button type="submit" id="signup-1-btn" class="w-full h-11 bg-[#5D50A2] hover:bg-[#4E428D] active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#5D50A2]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
-              <span>Send Verification Code</span>
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-            </button>
-          </div>
-        </form>
-
-        <div class="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
-          Already have an account? 
-          <button type="button" id="link-goto-login" onclick="switchAuthMode('login')" class="text-[#5D50A2] dark:text-purple-300 font-semibold hover:underline cursor-pointer ml-1">Sign in</button>
-        </div>
-      </div>
-
-      <!-- VIEW 3: SIGN UP - STEP 2 (OTP CODE ENTRY) -->
-      <div id="auth-view-signup-2" class="space-y-4 hidden">
-        <div class="mb-2">
-          <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-            <span class="font-medium text-slate-700 dark:text-slate-300">Step 2 of 3</span>
-            <span>Enter Code</span>
-          </div>
-          <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-[#5D50A2] h-full w-2/3 rounded-full transition-all duration-300"></div>
-          </div>
-        </div>
-
-        <div class="text-center mb-4">
-          <h2 class="text-base font-semibold text-slate-900 dark:text-white">Check your email</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            We sent a verification code to <b id="otp-target-email" class="text-slate-900 dark:text-white font-medium"></b>
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase leading-none mb-2 text-white drop-shadow-sm">
+            WELCOME
+          </h1>
+          <p class="text-xs sm:text-sm font-bold tracking-[0.22em] text-blue-200 uppercase mb-4">
+            A10D ATTENDANCE
+          </p>
+          <p class="text-xs sm:text-sm text-blue-100/85 leading-relaxed max-w-xs font-normal">
+            Enterprise AI facial biometrics kiosk fleet & real-time SaaS attendance tracking platform.
           </p>
         </div>
 
-        <form onsubmit="handleSignupStep2Submit(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5 text-center">
-              Verification Code
-            </label>
-            <input 
-              id="signup-otp-input" 
-              type="text" 
-              inputmode="numeric" 
-              autocomplete="one-time-code" 
-              maxlength="10" 
-              placeholder="••••••••" 
-              required
-              class="w-full h-14 text-center font-mono text-2xl font-bold tracking-[0.35em] bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:border-[#5D50A2] focus:ring-4 focus:ring-[#5D50A2]/20 transition-all"
-            >
-            <p class="text-[11px] text-slate-400 dark:text-slate-500 text-center mt-1.5">
-              Paste or enter your 6-digit or 8-digit code
-            </p>
-          </div>
-
-          <div class="pt-1">
-            <button type="submit" id="signup-2-btn" class="w-full h-11 bg-[#5D50A2] hover:bg-[#4E428D] active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#5D50A2]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
-              <span>Verify Code</span>
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </button>
-          </div>
-        </form>
-
-        <div class="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
-          <button type="button" onclick="goToSignupStep(1)" class="text-slate-500 hover:text-slate-800 dark:hover:text-white cursor-pointer">
-            ← Change email
-          </button>
-          <div>
-            Didn't receive it? 
-            <button type="button" id="resend-btn" onclick="resendOtpCode()" class="text-[#5D50A2] dark:text-purple-300 font-semibold hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-              Resend code
-            </button>
-            <span id="resend-timer-text" class="text-slate-400 text-[11px] hidden ml-1"></span>
-          </div>
-        </div>
+        <!-- Spacer allowing spheres to remain prominent at bottom -->
+        <div class="relative z-20 h-28 sm:h-36"></div>
       </div>
 
-      <!-- VIEW 4: SIGN UP - STEP 3 (PASSWORD SETUP) -->
-      <div id="auth-view-signup-3" class="space-y-4 hidden">
-        <div class="mb-2">
-          <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-            <span class="font-medium text-slate-700 dark:text-slate-300">Step 3 of 3</span>
-            <span>Create Password</span>
-          </div>
-          <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-[#5D50A2] h-full w-full rounded-full transition-all duration-300"></div>
-          </div>
-        </div>
+      <!-- Right Form Panel -->
+      <div class="w-full md:w-[52%] p-6 sm:p-10 lg:p-12 relative flex flex-col justify-center bg-white dark:bg-[#151B28]">
+        
+        <!-- Decorative 3D Sphere in Bottom-Right Corner (matching reference image) -->
+        <div class="sphere-3d-corner w-32 h-32 sm:w-40 sm:h-40 rounded-full absolute -bottom-14 -right-14 pointer-events-none opacity-85 hidden sm:block z-0"></div>
 
-        <form onsubmit="handleSignupStep3Submit(event)" class="space-y-3.5">
-          <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Create Admin Password</label>
-            <input id="signup-password" type="password" required autocomplete="new-password" placeholder="At least 6 characters" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
+        <div class="relative z-10 w-full">
+          <!-- Form Header -->
+          <div class="mb-6">
+            <h2 id="auth-form-title" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Sign in</h2>
+            <p id="auth-form-subtitle" class="text-xs text-slate-400 dark:text-slate-500 mt-1">Enter your credentials to access your workspace</p>
           </div>
 
-          <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Confirm Admin Password</label>
-            <input id="signup-confirm-password" type="password" required autocomplete="new-password" placeholder="Repeat password" class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#5D50A2] focus:ring-2 focus:ring-[#5D50A2]/20 transition-all">
+          <!-- Alert Box -->
+          <div id="auth-alert-box" class="hidden mb-4 p-3 rounded-xl text-xs font-medium flex items-start space-x-2.5">
+            <span id="auth-alert-icon" class="shrink-0 mt-0.5"></span>
+            <span id="auth-alert-text" class="flex-1 leading-relaxed"></span>
           </div>
 
-          <!-- Human / Admin Verification Checkbox -->
-          <div class="pt-1">
-            <label class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 flex items-center space-x-3 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors">
-              <input type="checkbox" id="human-verify-check" required class="w-4 h-4 text-[#5D50A2] rounded border-slate-300 focus:ring-[#5D50A2] cursor-pointer">
-              <span class="text-xs text-slate-700 dark:text-slate-300">
-                I confirm I am setting up this workspace as an authorized administrator
-              </span>
-            </label>
-          </div>
+          <!-- VIEW 1: SIGN IN FORM (MATCHING REFERENCE IMAGE) -->
+          <div id="auth-view-login" class="space-y-4">
+            <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+              <!-- User Name / Email Input -->
+              <div class="space-y-1">
+                <div class="flex items-center space-x-3 px-4 py-3.5 bg-[#F4F6FA] dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl focus-within:ring-2 focus-within:ring-[#18468b]/20 focus-within:border-[#18468b] transition-all">
+                  <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  <input id="login-email" type="email" required autocomplete="email" placeholder="User Name" class="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none">
+                </div>
+              </div>
 
-          <div class="pt-2">
-            <button type="submit" id="signup-3-btn" class="w-full h-11 bg-[#5D50A2] hover:bg-[#4E428D] active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#5D50A2]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
-              <span>Complete Setup & Log In</span>
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
+              <!-- Password Input with SHOW Button -->
+              <div class="space-y-1">
+                <div class="flex items-center space-x-3 px-4 py-3.5 bg-[#F4F6FA] dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl focus-within:ring-2 focus-within:ring-[#18468b]/20 focus-within:border-[#18468b] transition-all relative">
+                  <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <input id="login-password" type="password" required autocomplete="current-password" placeholder="Password" class="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none pr-14">
+                  <button type="button" onclick="togglePasswordVisibility('login-password', this)" class="absolute right-4 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 hover:text-[#18468b] dark:hover:text-blue-400 uppercase tracking-wider cursor-pointer select-none">
+                    SHOW
+                  </button>
+                </div>
+              </div>
+
+              <!-- Options Row: Remember me + Forgot Password -->
+              <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
+                <label class="flex items-center space-x-2 cursor-pointer select-none">
+                  <input type="checkbox" id="login-remember-me" checked class="w-3.5 h-3.5 rounded border-slate-300 text-[#18468b] focus:ring-[#18468b] cursor-pointer">
+                  <span class="text-[11px] font-medium text-slate-600 dark:text-slate-300">Remember me</span>
+                </label>
+                <button type="button" onclick="alert('Forgot password? Please re-verify your work email through the Sign Up tab or contact your administrator.')" class="text-[11px] text-slate-500 hover:text-[#18468b] dark:hover:text-blue-400 font-medium transition-colors cursor-pointer">
+                  Forgot Password?
+                </button>
+              </div>
+
+              <!-- Primary Submit Button: Sign in -->
+              <div class="pt-2">
+                <button type="submit" id="login-btn" class="w-full py-3.5 px-4 bg-[#18468b] hover:bg-[#12366c] active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-md shadow-[#18468b]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
+                  <span>Sign in</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- "Or" Divider -->
+            <div class="relative flex items-center justify-center my-3">
+              <div class="border-t border-slate-200 dark:border-slate-700/80 w-full"></div>
+              <span class="bg-white dark:bg-[#151B28] px-3 text-[11px] font-medium text-slate-400 uppercase tracking-widest absolute">Or</span>
+            </div>
+
+            <!-- Secondary Button: Sign in with other -->
+            <button type="button" onclick="quickFillDemoWorkspace()" class="w-full py-3 px-4 bg-white dark:bg-slate-800/80 border border-slate-700 dark:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-[0.99] text-slate-800 dark:text-slate-200 font-semibold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2">
+              <span>Sign in with other</span>
             </button>
+
+            <!-- Footer: Don't have an account? Sign up -->
+            <div class="text-center text-xs text-slate-500 dark:text-slate-400 pt-3">
+              Don't have an account? 
+              <button type="button" id="link-goto-signup" onclick="switchAuthMode('signup')" class="text-[#18468b] dark:text-blue-400 font-bold hover:underline cursor-pointer ml-1">Sign up</button>
+            </div>
           </div>
-        </form>
+
+          <!-- VIEW 2: SIGN UP - STEP 1 (EMAIL ENTRY) -->
+          <div id="auth-view-signup-1" class="space-y-4 hidden">
+            <div class="mb-2">
+              <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                <span class="font-medium text-slate-700 dark:text-slate-300">Step 1 of 3</span>
+                <span>Work Email</span>
+              </div>
+              <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                <div class="bg-[#18468b] h-full w-1/3 rounded-full transition-all duration-300"></div>
+              </div>
+            </div>
+
+            <form onsubmit="handleSignupStep1Submit(event)" class="space-y-4">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-3 px-4 py-3.5 bg-[#F4F6FA] dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl focus-within:ring-2 focus-within:ring-[#18468b]/20 focus-within:border-[#18468b] transition-all">
+                  <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                  </svg>
+                  <input id="signup-email" type="email" required autocomplete="email" placeholder="admin@yourcompany.com" class="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none">
+                </div>
+              </div>
+
+              <div class="space-y-1">
+                <div class="flex items-center space-x-3 px-4 py-3.5 bg-[#F4F6FA] dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl focus-within:ring-2 focus-within:ring-[#18468b]/20 focus-within:border-[#18468b] transition-all">
+                  <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="m3 9 2.45-4.9A2 2 0 0 1 7.24 3h9.52a2 2 0 0 1 1.8 1.1L21 9"/>
+                  </svg>
+                  <input id="signup-company" type="text" placeholder="Company / Workspace Name (Optional)" class="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none">
+                </div>
+              </div>
+
+              <div class="pt-2">
+                <button type="submit" id="signup-1-btn" class="w-full py-3.5 px-4 bg-[#18468b] hover:bg-[#12366c] active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-md shadow-[#18468b]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
+                  <span>Send Verification Code</span>
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              </div>
+            </form>
+
+            <div class="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
+              Already have an account? 
+              <button type="button" id="link-goto-login" onclick="switchAuthMode('login')" class="text-[#18468b] dark:text-blue-400 font-bold hover:underline cursor-pointer ml-1">Sign in</button>
+            </div>
+          </div>
+
+          <!-- VIEW 3: SIGN UP - STEP 2 (OTP CODE ENTRY) -->
+          <div id="auth-view-signup-2" class="space-y-4 hidden">
+            <div class="mb-2">
+              <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                <span class="font-medium text-slate-700 dark:text-slate-300">Step 2 of 3</span>
+                <span>Enter Code</span>
+              </div>
+              <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                <div class="bg-[#18468b] h-full w-2/3 rounded-full transition-all duration-300"></div>
+              </div>
+            </div>
+
+            <div class="text-center mb-2">
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                We sent a verification code to <b id="otp-target-email" class="text-slate-900 dark:text-white font-semibold"></b>
+              </p>
+            </div>
+
+            <form onsubmit="handleSignupStep2Submit(event)" class="space-y-4">
+              <div>
+                <input 
+                  id="signup-otp-input" 
+                  type="text" 
+                  inputmode="numeric" 
+                  autocomplete="one-time-code" 
+                  maxlength="10" 
+                  placeholder="••••••••" 
+                  required
+                  class="w-full h-14 text-center font-mono text-2xl font-bold tracking-[0.35em] bg-[#F4F6FA] dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:border-[#18468b] focus:ring-4 focus:ring-[#18468b]/20 transition-all"
+                >
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 text-center mt-1.5">
+                  Paste or enter your 6-digit or 8-digit code
+                </p>
+              </div>
+
+              <div class="pt-1">
+                <button type="submit" id="signup-2-btn" class="w-full py-3.5 px-4 bg-[#18468b] hover:bg-[#12366c] active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-md shadow-[#18468b]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
+                  <span>Verify Code</span>
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </button>
+              </div>
+            </form>
+
+            <div class="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
+              <button type="button" onclick="goToSignupStep(1)" class="text-slate-500 hover:text-slate-800 dark:hover:text-white cursor-pointer">
+                ← Change email
+              </button>
+              <div>
+                Didn't receive it? 
+                <button type="button" id="resend-btn" onclick="resendOtpCode()" class="text-[#18468b] dark:text-blue-400 font-semibold hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                  Resend code
+                </button>
+                <span id="resend-timer-text" class="text-slate-400 text-[11px] hidden ml-1"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW 4: SIGN UP - STEP 3 (PASSWORD SETUP) -->
+          <div id="auth-view-signup-3" class="space-y-4 hidden">
+            <div class="mb-2">
+              <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                <span class="font-medium text-slate-700 dark:text-slate-300">Step 3 of 3</span>
+                <span>Create Password</span>
+              </div>
+              <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                <div class="bg-[#18468b] h-full w-full rounded-full transition-all duration-300"></div>
+              </div>
+            </div>
+
+            <form onsubmit="handleSignupStep3Submit(event)" class="space-y-3.5">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-3 px-4 py-3 bg-[#F4F6FA] dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl focus-within:ring-2 focus-within:ring-[#18468b]/20 focus-within:border-[#18468b] transition-all relative">
+                  <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <input id="signup-password" type="password" required autocomplete="new-password" placeholder="Admin Password (min 6 chars)" class="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none pr-14">
+                  <button type="button" onclick="togglePasswordVisibility('signup-password', this)" class="absolute right-4 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 hover:text-[#18468b] dark:hover:text-blue-400 uppercase tracking-wider cursor-pointer select-none">
+                    SHOW
+                  </button>
+                </div>
+              </div>
+
+              <div class="space-y-1">
+                <div class="flex items-center space-x-3 px-4 py-3 bg-[#F4F6FA] dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl focus-within:ring-2 focus-within:ring-[#18468b]/20 focus-within:border-[#18468b] transition-all relative">
+                  <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <input id="signup-confirm-password" type="password" required autocomplete="new-password" placeholder="Confirm Admin Password" class="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none pr-14">
+                  <button type="button" onclick="togglePasswordVisibility('signup-confirm-password', this)" class="absolute right-4 text-[11px] font-extrabold text-slate-500 dark:text-slate-400 hover:text-[#18468b] dark:hover:text-blue-400 uppercase tracking-wider cursor-pointer select-none">
+                    SHOW
+                  </button>
+                </div>
+              </div>
+
+              <!-- Human / Admin Verification Checkbox -->
+              <div class="pt-1">
+                <label class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 flex items-center space-x-3 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors">
+                  <input type="checkbox" id="human-verify-check" required class="w-4 h-4 text-[#18468b] rounded border-slate-300 focus:ring-[#18468b] cursor-pointer">
+                  <span class="text-xs text-slate-700 dark:text-slate-300">
+                    I confirm I am setting up this workspace as an authorized administrator
+                  </span>
+                </label>
+              </div>
+
+              <div class="pt-2">
+                <button type="submit" id="signup-3-btn" class="w-full py-3.5 px-4 bg-[#18468b] hover:bg-[#12366c] active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-md shadow-[#18468b]/20 transition-all cursor-pointer flex items-center justify-center space-x-2">
+                  <span>Complete Setup & Log In</span>
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </button>
+              </div>
+            </form>
+          </div>
+
+        </div>
       </div>
 
     </div>
