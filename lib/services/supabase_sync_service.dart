@@ -200,13 +200,22 @@ class SupabaseSyncService {
 
       // 2. Safe fallback attempt to kiosks table if present
       try {
-        await Supabase.instance.client.from('kiosks').upsert({
+        final kioskData = <String, dynamic>{
           'device_id': devId,
           'device_name': devName,
           'platform': 'Android Phone',
           'is_active': true,
           'last_heartbeat': DateTime.now().toUtc().toIso8601String(),
-        }, onConflict: 'device_id');
+        };
+        if (currentUserId != null) {
+          kioskData['user_id'] = currentUserId;
+        }
+        try {
+          await Supabase.instance.client.from('kiosks').upsert(kioskData);
+        } catch (_) {
+          kioskData.remove('user_id');
+          await Supabase.instance.client.from('kiosks').upsert(kioskData);
+        }
       } catch (_) {}
 
       debugPrint('Kiosk registered active in cloud: $devName ($devId)');
@@ -441,6 +450,9 @@ class SupabaseSyncService {
         'embeddings': user.embeddings,
         'created_at': user.registeredAt.toUtc().toIso8601String(),
       };
+      if (currentUserId != null) {
+        payload['user_id'] = currentUserId;
+      }
 
       // Check if this employee already exists on remote by name
       dynamic existing;
@@ -453,23 +465,47 @@ class SupabaseSyncService {
       } catch (_) {}
 
       dynamic res;
-      if (existing != null && existing['id'] != null) {
-        final existingId = existing['id'] as String;
-        res = await Supabase.instance.client
-            .from('employees')
-            .update(payload)
-            .eq('id', existingId)
-            .select('id')
-            .maybeSingle();
-        _employeeUuidCache[user.name] = existingId;
-        debugPrint('Updated employee ${user.name} on Supabase (ID: $existingId)');
-        return existingId;
-      } else {
-        res = await Supabase.instance.client
-            .from('employees')
-            .insert(payload)
-            .select('id')
-            .maybeSingle();
+      try {
+        if (existing != null && existing['id'] != null) {
+          final existingId = existing['id'] as String;
+          res = await Supabase.instance.client
+              .from('employees')
+              .update(payload)
+              .eq('id', existingId)
+              .select('id')
+              .maybeSingle();
+          _employeeUuidCache[user.name] = existingId;
+          debugPrint('Updated employee ${user.name} on Supabase (ID: $existingId)');
+          return existingId;
+        } else {
+          res = await Supabase.instance.client
+              .from('employees')
+              .insert(payload)
+              .select('id')
+              .maybeSingle();
+        }
+      } catch (e) {
+        // Fallback: If user_id column is not in schema, try without user_id
+        if (payload.containsKey('user_id')) {
+          payload.remove('user_id');
+          if (existing != null && existing['id'] != null) {
+            final existingId = existing['id'] as String;
+            res = await Supabase.instance.client
+                .from('employees')
+                .update(payload)
+                .eq('id', existingId)
+                .select('id')
+                .maybeSingle();
+            _employeeUuidCache[user.name] = existingId;
+            return existingId;
+          } else {
+            res = await Supabase.instance.client
+                .from('employees')
+                .insert(payload)
+                .select('id')
+                .maybeSingle();
+          }
+        }
       }
 
       if (res != null && res['id'] != null) {
@@ -541,6 +577,9 @@ class SupabaseSyncService {
           'device_id': punchItem.deviceId,
           'created_at': punchItem.createdAt.toUtc().toIso8601String(),
         };
+        if (currentUserId != null) {
+          insertData['user_id'] = currentUserId;
+        }
         if (punchItem.employeeId != null) {
           insertData['employee_id'] = punchItem.employeeId;
         }
@@ -550,10 +589,11 @@ class SupabaseSyncService {
           debugPrint('Attendance for $employeeName pushed online to Supabase.');
           pushedOnline = true;
         } catch (e) {
-          debugPrint('Initial attendance log insert notice: $e. Retrying without employee_id fallback...');
+          debugPrint('Initial attendance log insert notice: $e. Retrying without user_id / employee_id fallback...');
           insertData.remove('employee_id');
+          insertData.remove('user_id');
           await Supabase.instance.client.from('attendance_logs').insert(insertData);
-          debugPrint('Attendance for $employeeName pushed online without employee_id.');
+          debugPrint('Attendance for $employeeName pushed online without user_id / employee_id.');
           pushedOnline = true;
         }
       } catch (e) {
@@ -606,7 +646,14 @@ class SupabaseSyncService {
     debugPrint('Flushing ${queue.length} offline punches to Supabase...');
     final remaining = <OfflinePunchItem>[];
 
+    final now = DateTime.now();
     for (final punch in queue) {
+      // Discard stale punches older than 48 hours to prevent stuck "SYNCING" loop
+      if (now.difference(punch.createdAt).inHours > 48) {
+        debugPrint('Discarding expired offline punch for ${punch.employeeName}');
+        continue;
+      }
+
       try {
         final insertData = <String, dynamic>{
           'employee_name': punch.employeeName,
@@ -615,6 +662,9 @@ class SupabaseSyncService {
           'device_id': punch.deviceId,
           'created_at': punch.createdAt.toUtc().toIso8601String(),
         };
+        if (currentUserId != null) {
+          insertData['user_id'] = currentUserId;
+        }
         if (punch.employeeId != null && _uuidRegex.hasMatch(punch.employeeId!)) {
           insertData['employee_id'] = punch.employeeId;
         }
@@ -623,8 +673,9 @@ class SupabaseSyncService {
           await Supabase.instance.client.from('attendance_logs').insert(insertData);
           debugPrint('Offline punch for ${punch.employeeName} synced successfully.');
         } catch (e) {
-          debugPrint('Queued punch failed with notice: $e. Retrying without employee_id fallback...');
+          debugPrint('Queued punch retry without user_id/employee_id fallback: $e');
           insertData.remove('employee_id');
+          insertData.remove('user_id');
           await Supabase.instance.client.from('attendance_logs').insert(insertData);
           debugPrint('Offline punch for ${punch.employeeName} synced successfully with fallback.');
         }

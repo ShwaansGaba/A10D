@@ -216,14 +216,14 @@ class FaceRecognitionService {
       }
     }
 
-    // 3. Import any remote employees that have embeddings and are not yet in local cache
+    // 3. Import any remote employees that have photo or embeddings and are not yet in local cache
     for (final emp in remoteEmployees) {
       final name = emp['name'] as String?;
       if (name == null || name.trim().isEmpty) continue;
       final empId = emp['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
       final hasLocal = updatedList.any((u) => u.name.trim().toLowerCase() == name.trim().toLowerCase());
 
-      if (!hasLocal && emp['embeddings'] != null) {
+      if (!hasLocal) {
         List<List<double>> parsedEmbeddings = [];
         try {
           final rawEmbeddings = emp['embeddings'];
@@ -236,26 +236,41 @@ class FaceRecognitionService {
           }
         } catch (_) {}
 
-        if (parsedEmbeddings.isNotEmpty) {
-          String localPhotoPath = '';
-          final photoUrl = emp['photo_url'] as String?;
-          if (photoUrl != null && photoUrl.startsWith('data:image')) {
-            try {
-              final commaIdx = photoUrl.indexOf(',');
-              if (commaIdx != -1) {
-                final base64Str = photoUrl.substring(commaIdx + 1);
-                final bytes = base64Decode(base64Str);
-                final appDir = await getApplicationDocumentsDirectory();
-                final fileName = 'cloud_face_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                final file = File(p.join(appDir.path, fileName));
-                await file.writeAsBytes(bytes);
-                localPhotoPath = file.path;
-              }
-            } catch (_) {}
-          } else if (photoUrl != null && photoUrl.isNotEmpty) {
-            localPhotoPath = photoUrl;
-          }
+        String localPhotoPath = '';
+        final photoUrl = emp['photo_url'] as String?;
+        if (photoUrl != null && photoUrl.startsWith('data:image')) {
+          try {
+            final commaIdx = photoUrl.indexOf(',');
+            if (commaIdx != -1) {
+              final base64Str = photoUrl.substring(commaIdx + 1);
+              final bytes = base64Decode(base64Str);
+              final appDir = await getApplicationDocumentsDirectory();
+              final fileName = 'cloud_face_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+              final file = File(p.join(appDir.path, fileName));
+              await file.writeAsBytes(bytes);
+              localPhotoPath = file.path;
+            }
+          } catch (_) {}
+        } else if (photoUrl != null && photoUrl.isNotEmpty) {
+          localPhotoPath = photoUrl;
+        }
 
+        // BIOMETRIC RESOLUTION: If photo is available, extract the exact ML Kit geometric vector!
+        // This ensures employees enrolled on the web client or uploaded via photo are seamlessly
+        // scanned and recognized by the mobile camera!
+        if (localPhotoPath.isNotEmpty && File(localPhotoPath).existsSync()) {
+          try {
+            final extraction = await extractFaceEmbedding(localPhotoPath);
+            if (extraction != null && extraction.embedding.isNotEmpty) {
+              parsedEmbeddings = [extraction.embedding];
+              debugPrint('Biometric vector computed from photo for employee: ${name.trim()}');
+            }
+          } catch (e) {
+            debugPrint('ML Kit photo feature extraction notice for ${name.trim()}: $e');
+          }
+        }
+
+        if (parsedEmbeddings.isNotEmpty || localPhotoPath.isNotEmpty) {
           final newUser = RegisteredUser(
             id: empId,
             name: name.trim(),
@@ -264,7 +279,7 @@ class FaceRecognitionService {
             embeddings: parsedEmbeddings,
           );
           updatedList.add(newUser);
-          debugPrint('Synced employee from remote into local face database: ${newUser.name}');
+          debugPrint('Synced employee from remote into local face database: ${newUser.name} (Embeddings: ${parsedEmbeddings.length})');
         }
       }
     }

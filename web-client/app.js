@@ -2353,11 +2353,24 @@ async function processWebScannerFrame() {
           photo_url: thumbDataUrl,
           created_at: new Date().toISOString()
         };
+        if (currentAuthUser && currentAuthUser.id) {
+          punchRecord.user_id = currentAuthUser.id;
+        }
 
         let { data, error } = await supabaseClient
           .from('attendance_logs')
           .insert([punchRecord])
           .select();
+
+        if (error && punchRecord.user_id) {
+          delete punchRecord.user_id;
+          const retry = await supabaseClient
+            .from('attendance_logs')
+            .insert([punchRecord])
+            .select();
+          data = retry.data;
+          error = retry.error;
+        }
 
         if (!error && data && data[0]) {
           attendanceLogs.unshift(data[0]);
@@ -2609,13 +2622,28 @@ async function handleManualPunch(e) {
       device_id: reason ? `Manual (${reason})` : 'Manual HR Correction',
       created_at: timestampIso
     };
+    if (currentAuthUser && currentAuthUser.id) {
+      punchPayload.user_id = currentAuthUser.id;
+    }
 
     let { data, error } = await supabaseClient
       .from('attendance_logs')
       .insert([punchPayload])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      if (punchPayload.user_id) {
+        delete punchPayload.user_id;
+        const res = await supabaseClient
+          .from('attendance_logs')
+          .insert([punchPayload])
+          .select();
+        if (res.error) throw res.error;
+        data = res.data;
+      } else {
+        throw error;
+      }
+    }
 
     closeManualPunchModal();
     document.getElementById('manual-punch-reason').value = '';
@@ -2721,13 +2749,30 @@ async function handleCreateEmployee(e) {
       embeddings: capturedEnrollEmbedding || null,
       is_active: true,
     };
+    if (currentAuthUser && currentAuthUser.id) {
+      newRecord.user_id = currentAuthUser.id;
+    }
 
     let { data, error } = await supabaseClient
       .from('employees')
       .insert([newRecord])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      // Fallback: If user_id column does not exist in schema, retry without user_id
+      if (newRecord.user_id) {
+        delete newRecord.user_id;
+        const fallbackRes = await supabaseClient
+          .from('employees')
+          .insert([newRecord])
+          .select();
+        if (fallbackRes.error) throw fallbackRes.error;
+        data = fallbackRes.data;
+      } else {
+        throw error;
+      }
+    }
+
     closeAddEmployeeModal();
     document.getElementById('new-emp-name').value = '';
     document.getElementById('new-emp-code').value = '';
