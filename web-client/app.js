@@ -924,7 +924,7 @@ async function handleForgotPassword() {
 }
 
 // ------------------------------------------------------------------
-// Active Kiosks Fleet Management (Realtime Presence + Logs Aggregate)
+// Active Kiosks Fleet Management (Tenant-Scoped Realtime Presence)
 // ------------------------------------------------------------------
 let presenceFleetChannel = null;
 let realtimePresenceKiosks = [];
@@ -937,7 +937,9 @@ function subscribeToPresenceFleet() {
       presenceFleetChannel = null;
     }
 
-    presenceFleetChannel = supabaseClient.channel('kiosk-fleet-presence');
+    // Tenant-isolated channel: Only kiosks belonging to this specific user ID connect!
+    const channelName = currentAuthUser ? ('presence_kiosks_' + currentAuthUser.id) : 'presence_kiosks_guest';
+    presenceFleetChannel = supabaseClient.channel(channelName);
     presenceFleetChannel
       .on('presence', { event: 'sync' }, () => {
         const state = presenceFleetChannel.presenceState();
@@ -959,6 +961,8 @@ function subscribeToPresenceFleet() {
               device_id: 'web_dashboard_' + (currentAuthUser ? currentAuthUser.id.slice(0, 8) : 'admin'),
               device_name: 'Web Admin Dashboard',
               platform: 'Web',
+              user_id: currentAuthUser ? currentAuthUser.id : '',
+              user_email: currentAuthUser ? currentAuthUser.email : '',
               status: 'ONLINE',
               online_at: new Date().toISOString(),
             });
@@ -976,16 +980,24 @@ function handlePresenceStateChange(state) {
     const presences = state[key];
     if (Array.isArray(presences)) {
       for (const p of presences) {
-        if (p && p.device_id) {
-          list.push({
-            device_id: p.device_id,
-            device_name: p.device_name || 'Terminal',
-            platform: p.platform || 'Android Phone',
-            is_active: true,
-            last_heartbeat: p.online_at || new Date().toISOString(),
-            is_presence_online: true,
-          });
+        if (!p || !p.device_id) continue;
+
+        // Tenant boundary check: Strictly isolate kiosks to the currently logged in workspace account!
+        if (currentAuthUser) {
+          if (p.user_id && p.user_id !== currentAuthUser.id) continue;
+          if (!p.user_id && p.user_email && p.user_email.toLowerCase() !== currentAuthUser.email.toLowerCase()) continue;
+          if (!p.user_id && !p.user_email && p.platform !== 'Web') continue;
         }
+
+        list.push({
+          device_id: p.device_id,
+          device_name: p.device_name || 'Terminal',
+          platform: p.platform || 'Android Phone',
+          user_id: p.user_id || '',
+          is_active: true,
+          last_heartbeat: p.online_at || new Date().toISOString(),
+          is_presence_online: true,
+        });
       }
     }
   }
@@ -998,17 +1010,23 @@ async function fetchActiveKiosks() {
 
   let tableKiosks = [];
   try {
-    const { data, error } = await supabaseClient
+    let query = supabaseClient
       .from('kiosks')
       .select('*')
       .order('last_heartbeat', { ascending: false });
+
+    // Strict tenant filtering on kiosks table
+    if (currentAuthUser && currentAuthUser.id) {
+      query = query.eq('user_id', currentAuthUser.id);
+    }
+    const { data, error } = await query;
 
     if (!error && Array.isArray(data)) {
       tableKiosks = data;
     }
   } catch (_) {}
 
-  // Aggregate with recent devices from attendance_logs
+  // Aggregate with recent devices from attendance_logs (marked inactive unless live)
   const recentLogsKiosks = [];
   if (Array.isArray(attendanceLogs)) {
     const seenDevs = new Set();
@@ -1017,7 +1035,7 @@ async function fetchActiveKiosks() {
       if (log.device_id && !seenDevs.has(log.device_id)) {
         seenDevs.add(log.device_id);
         const logTime = new Date(log.created_at).getTime();
-        const isRecent = (now - logTime) < (24 * 60 * 60 * 1000); // 24 hours
+        const isRecent = (now - logTime) < (3 * 60 * 1000); // Only within last 3 minutes
         recentLogsKiosks.push({
           device_id: log.device_id,
           device_name: log.device_id.startsWith('kiosk_') ? 'Android Terminal (Kiosk)' : log.device_id,
@@ -1051,16 +1069,19 @@ function renderActiveKiosks() {
   if (!countBadge) return;
 
   const now = Date.now();
-  // Kiosk is active if presence is online OR heartbeat within last 15 minutes
+  // Kiosk is active if presence is online OR heartbeat within last 3 minutes
   const activeKiosks = activeKiosksList.filter((k) => {
     if (k.is_presence_online) return true;
     if (k.is_active === false) return false;
     const hbTime = new Date(k.last_heartbeat || k.created_at || 0).getTime();
-    return (now - hbTime) < (15 * 60 * 1000);
+    return (now - hbTime) < (3 * 60 * 1000);
   });
 
   const activeCount = activeKiosks.length;
   countBadge.innerText = `${activeCount} Kiosk${activeCount === 1 ? '' : 's'} Active`;
+
+  const dashKiosks = document.getElementById('dash-kiosks-count');
+  if (dashKiosks) dashKiosks.textContent = activeCount;
 
   if (!listContainer) return;
 
@@ -2790,12 +2811,16 @@ async function handleDeleteEmployee(id) {
   if (!supabaseClient) return;
 
   try {
-    const { data, error } = await supabaseClient.from('employees').delete().eq('id', id).select();
+    const { data, error } = await supabaseClient.from('employees').delete().eq('id', id);
     if (error) throw error;
-    if (!data || data.length === 0) {
-      showRlsFixModal();
-      return;
-    }
+    
+    // Remove immediately from UI and local array
+    employeesList = employeesList.filter(e => e.id !== id);
+    renderEmployees(employeesList);
+    updateMetrics();
+    renderSummaryView();
+    
+    // Also re-fetch to ensure synchronization with cloud
     await fetchEmployees();
   } catch (err) {
     alert('Error deleting: ' + err.message);
