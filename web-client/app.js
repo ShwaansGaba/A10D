@@ -466,13 +466,29 @@ async function handleSignupStep2Submit(e) {
   safeCreateIcons();
 
   try {
-    const { data, error } = await supabaseClient.auth.verifyOtp({
+    // Attempt verification with type: 'email' (standard for signInWithOtp)
+    let res = await supabaseClient.auth.verifyOtp({
       email: pendingSignupEmail,
       token: otp,
       type: 'email',
     });
 
-    if (error) throw error;
+    // If type 'email' failed, attempt type 'signup' (in case GoTrue tagged it under signup confirmation)
+    if (res.error) {
+      console.warn('verifyOtp with type email returned error, trying type signup fallback...', res.error);
+      const resSignup = await supabaseClient.auth.verifyOtp({
+        email: pendingSignupEmail,
+        token: otp,
+        type: 'signup',
+      });
+      if (!resSignup.error) {
+        res = resSignup;
+      } else {
+        throw res.error;
+      }
+    }
+
+    if (res.error) throw res.error;
     // OTP verified successfully; advance to password setup
     goToSignupStep(3);
   } catch (err) {
