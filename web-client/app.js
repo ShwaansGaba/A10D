@@ -24,6 +24,7 @@ let activeKiosksList = [];
 let authMode = 'login'; // 'login' | 'signup'
 let signupStep = 1;     // 1: Email, 2: OTP, 3: Password & Captcha
 let pendingSignupEmail = '';
+let isSignupInProgress = false;
 let resendTimerInterval = null;
 let isCaptchaVerified = false;
 
@@ -142,6 +143,9 @@ function applyTheme(theme) {
 async function initAuth() {
   if (!supabaseClient) return;
 
+  const signupInProgress = sessionStorage.getItem('a10d_signup_in_progress') === 'true';
+  const savedSignupEmail = sessionStorage.getItem('a10d_signup_email') || '';
+
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session && session.user) {
@@ -150,6 +154,17 @@ async function initAuth() {
         showAuthOverlay();
         return;
       }
+
+      if (signupInProgress) {
+        // User was setting up their password in Step 3! Do not auto-login to dashboard!
+        isSignupInProgress = true;
+        authMode = 'signup';
+        pendingSignupEmail = savedSignupEmail || session.user.email || '';
+        showAuthOverlay();
+        goToSignupStep(3);
+        return;
+      }
+
       handleAuthSuccess(session.user);
     } else {
       showAuthOverlay();
@@ -168,10 +183,19 @@ async function initAuth() {
         showAuthOverlay();
         return;
       }
+
+      // CRITICAL: If user is actively signing up, DO NOT bypass Step 3 (password setup)!
+      if (authMode === 'signup' || isSignupInProgress) {
+        console.log('Holding auto-login: user must set account password in Step 3.');
+        return;
+      }
+
       handleAuthSuccess(session.user);
     } else if (event === 'SIGNED_OUT') {
       currentAuthUser = null;
-      showAuthOverlay();
+      if (!isSignupInProgress) {
+        showAuthOverlay();
+      }
     }
   });
 }
@@ -260,6 +284,8 @@ function switchAuthMode(mode) {
   const subtitleEl = document.getElementById('auth-form-subtitle');
 
   if (mode === 'login') {
+    isSignupInProgress = false;
+    sessionStorage.removeItem('a10d_signup_in_progress');
     if (titleEl) titleEl.textContent = 'Sign in';
     if (subtitleEl) subtitleEl.textContent = 'Enter your credentials to access your workspace';
 
@@ -554,6 +580,11 @@ async function handleSignupStep2Submit(e) {
   safeCreateIcons();
 
   try {
+    // Explicitly lock into signup flow so onAuthStateChange does NOT skip password setup
+    isSignupInProgress = true;
+    sessionStorage.setItem('a10d_signup_in_progress', 'true');
+    sessionStorage.setItem('a10d_signup_email', pendingSignupEmail);
+
     // Attempt verification with type: 'email' (standard for signInWithOtp)
     let res = await supabaseClient.auth.verifyOtp({
       email: pendingSignupEmail,
@@ -577,7 +608,9 @@ async function handleSignupStep2Submit(e) {
     }
 
     if (res.error) throw res.error;
-    // OTP verified successfully; advance to password setup
+
+    // Ensure auth container is visible and explicitly advance to Step 3 (Password Setup)
+    showAuthOverlay();
     goToSignupStep(3);
   } catch (err) {
     console.error('OTP Verify Error:', err);
@@ -619,29 +652,32 @@ async function handleSignupStep3Submit(e) {
   }
 
   const btn = document.getElementById('signup-3-btn');
-  const originalHtml = btn ? btn.innerHTML : '<span>Complete Setup</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Complete Setup & Log In</span>';
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span>Activating Workspace...</span>';
+    btn.innerHTML = '<span>Saving Password & Activating...</span>';
   }
   safeCreateIcons();
 
   try {
-    // Set the user's permanent password
+    // 1. Set the user's permanent password in Supabase Auth
     const { data, error } = await supabaseClient.auth.updateUser({
       password: pass1,
     });
 
     if (error) throw error;
 
-    // Sign out to require clean login with credentials (as requested in specs)
-    await supabaseClient.auth.signOut();
+    // 2. Clear signup flags
+    isSignupInProgress = false;
+    authMode = 'login';
+    sessionStorage.removeItem('a10d_signup_in_progress');
+    sessionStorage.removeItem('a10d_signup_email');
 
-    // Return to login screen with prefilled email and celebration notification
-    switchAuthMode('login');
-    const loginEmailInput = document.getElementById('login-email');
-    if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
-    showAuthAlert('🎉 Workspace successfully registered and verified! Please sign in with your password.', 'success');
+    // 3. User now has a confirmed password set! Transition to dashboard or clean login
+    const activeUser = data.user || (await supabaseClient.auth.getUser()).data.user;
+    handleAuthSuccess(activeUser);
+
+    showPunchToast({ employee_name: 'Password set successfully! Welcome to A10D.' });
   } catch (err) {
     console.error('Password Update Error:', err);
     showAuthAlert(err.message || 'Failed to finalize account password. Please try again.');
