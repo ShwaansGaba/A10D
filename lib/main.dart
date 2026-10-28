@@ -38,7 +38,7 @@ class FaceAttendanceApp extends StatelessWidget {
     final isLoggedIn = SupabaseSyncService().isUserLoggedIn;
 
     return MaterialApp(
-      title: 'Face Attendance',
+      title: 'A10D',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,

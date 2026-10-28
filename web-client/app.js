@@ -167,18 +167,20 @@ async function initAuth() {
 }
 
 function showAuthOverlay() {
-  const overlay = document.getElementById('auth-overlay');
-  if (overlay) {
-    overlay.classList.remove('hidden');
+  const auth = document.getElementById('auth-container') || document.getElementById('auth-overlay');
+  const main = document.getElementById('main-app-container');
+  if (main) main.classList.add('hidden');
+  if (auth) {
+    auth.classList.remove('hidden');
     switchAuthMode('login');
   }
 }
 
 function hideAuthOverlay() {
-  const overlay = document.getElementById('auth-overlay');
-  if (overlay) {
-    overlay.classList.add('hidden');
-  }
+  const auth = document.getElementById('auth-container') || document.getElementById('auth-overlay');
+  const main = document.getElementById('main-app-container');
+  if (auth) auth.classList.add('hidden');
+  if (main) main.classList.remove('hidden');
 }
 
 function handleAuthSuccess(user) {
@@ -944,8 +946,8 @@ function switchTab(tab) {
   }
 
   // Active / Inactive dock tab button classes
-  const activeClass = 'w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white text-[#5D50A2] shadow-lg shadow-black/10 flex items-center justify-center cursor-pointer transition-all';
-  const inactiveClass = 'w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all';
+  const activeClass = 'w-full flex items-center space-x-3.5 px-4 py-3 rounded-2xl bg-white text-[#5D50A2] shadow-lg shadow-black/10 font-bold text-sm cursor-pointer transition-all';
+  const inactiveClass = 'w-full flex items-center space-x-3.5 px-4 py-3 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 font-medium text-sm cursor-pointer transition-all';
 
   // Toggle views
   Object.keys(views).forEach(key => {
@@ -1454,7 +1456,14 @@ async function fetchEmployees() {
     if (currentAuthUser) {
       query = query.eq('user_id', currentAuthUser.id);
     }
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
+      console.warn('user_id column missing in employees schema cache, falling back to unfiltered...');
+      const fallback = await supabaseClient.from('employees').select('*').order('name', { ascending: true });
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw error;
     employeesList = data || [];
@@ -1474,7 +1483,14 @@ async function fetchAttendanceLogs() {
     if (currentAuthUser) {
       query = query.eq('user_id', currentAuthUser.id);
     }
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
+      console.warn('user_id column missing in attendance_logs schema cache, falling back to unfiltered...');
+      const fallback = await supabaseClient.from('attendance_logs').select('*').order('created_at', { ascending: false }).limit(300);
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw error;
     attendanceLogs = data || [];
@@ -1509,24 +1525,28 @@ function isEmployeePunchedToday(employeeName, employeeId) {
 // Render Attendance Logs Table
 function renderAttendanceLogs(logs) {
   const tbody = document.getElementById('attendance-table-body');
-  if (!tbody) return;
+  const tbodyFull = document.getElementById('attendance-table-body-full');
+  if (!tbody && !tbodyFull) return;
+
+  const emptyHtml = `
+    <tr>
+      <td colspan="6" class="py-12 text-center text-gray-500">
+        <div class="flex flex-col items-center justify-center space-y-2">
+          <i data-lucide="clock" class="w-8 h-8 text-gray-400 dark:text-gray-600"></i>
+          <p class="text-sm">No attendance records logged yet.</p>
+        </div>
+      </td>
+    </tr>
+  `;
 
   if (!logs || logs.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" class="py-12 text-center text-gray-500">
-          <div class="flex flex-col items-center justify-center space-y-2">
-            <i data-lucide="clock" class="w-8 h-8 text-gray-400 dark:text-gray-600"></i>
-            <p class="text-sm">No attendance records logged yet.</p>
-          </div>
-        </td>
-      </tr>
-    `;
+    if (tbody) tbody.innerHTML = emptyHtml;
+    if (tbodyFull) tbodyFull.innerHTML = emptyHtml;
     safeCreateIcons();
     return;
   }
 
-  tbody.innerHTML = logs.map((log) => {
+  const rowsHtml = logs.map((log) => {
     const dateObj = new Date(log.created_at);
     const timeFormatted = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const dateFormatted = dateObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -1578,6 +1598,9 @@ function renderAttendanceLogs(logs) {
       </tr>
     `;
   }).join('');
+
+  if (tbody) tbody.innerHTML = rowsHtml;
+  if (tbodyFull) tbodyFull.innerHTML = rowsHtml;
 
   safeCreateIcons();
 }
@@ -2041,19 +2064,31 @@ async function processWebScannerFrame() {
     // Push punch-in to Supabase attendance_logs
     if (supabaseClient) {
       try {
-        const { data, error } = await supabaseClient
+        const punchRecord = {
+          employee_id: bestMatch.id,
+          employee_name: empName,
+          punch_type: 'IN',
+          confidence: highestScore,
+          device_id: 'Web-Kiosk',
+          photo_url: thumbDataUrl,
+          user_id: currentAuthUser ? currentAuthUser.id : null,
+          created_at: new Date().toISOString()
+        };
+
+        let { data, error } = await supabaseClient
           .from('attendance_logs')
-          .insert([{
-            employee_id: bestMatch.id,
-            employee_name: empName,
-            punch_type: 'IN',
-            confidence: highestScore,
-            device_id: 'Web-Kiosk',
-            photo_url: thumbDataUrl,
-            user_id: currentAuthUser ? currentAuthUser.id : null,
-            created_at: new Date().toISOString()
-          }])
+          .insert([punchRecord])
           .select();
+
+        if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
+          delete punchRecord.user_id;
+          const retry = await supabaseClient
+            .from('attendance_logs')
+            .insert([punchRecord])
+            .select();
+          data = retry.data;
+          error = retry.error;
+        }
 
         if (!error && data && data[0]) {
           attendanceLogs.unshift(data[0]);
@@ -2297,18 +2332,30 @@ async function handleManualPunch(e) {
   }
 
   try {
-    const { data, error } = await supabaseClient
+    const punchPayload = {
+      employee_id: empId,
+      employee_name: selectedEmp.name,
+      punch_type: 'IN',
+      confidence: 1.0,
+      device_id: reason ? `Manual (${reason})` : 'Manual HR Correction',
+      user_id: currentAuthUser ? currentAuthUser.id : null,
+      created_at: timestampIso
+    };
+
+    let { data, error } = await supabaseClient
       .from('attendance_logs')
-      .insert([{
-        employee_id: empId,
-        employee_name: selectedEmp.name,
-        punch_type: 'IN',
-        confidence: 1.0,
-        device_id: reason ? `Manual (${reason})` : 'Manual HR Correction',
-        user_id: currentAuthUser ? currentAuthUser.id : null,
-        created_at: timestampIso
-      }])
+      .insert([punchPayload])
       .select();
+
+    if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
+      delete punchPayload.user_id;
+      const retry = await supabaseClient
+        .from('attendance_logs')
+        .insert([punchPayload])
+        .select();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
 
@@ -2417,10 +2464,21 @@ async function handleCreateEmployee(e) {
       user_id: currentAuthUser ? currentAuthUser.id : null,
     };
 
-    const { data, error } = await supabaseClient
+    let { data, error } = await supabaseClient
       .from('employees')
       .insert([newRecord])
       .select();
+
+    if (error && (error.message.includes('user_id') || error.code === 'PGRST204')) {
+      console.warn('user_id column missing in schema cache, retrying without user_id...');
+      delete newRecord.user_id;
+      const retry = await supabaseClient
+        .from('employees')
+        .insert([newRecord])
+        .select();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
     closeAddEmployeeModal();

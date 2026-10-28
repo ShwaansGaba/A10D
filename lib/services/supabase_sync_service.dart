@@ -306,14 +306,26 @@ class SupabaseSyncService {
       final now = DateTime.now();
       // True start of the local day represented in UTC ISO format
       final startOfDay = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
-      var query = Supabase.instance.client
-          .from('attendance_logs')
-          .select('employee_name')
-          .gte('created_at', startOfDay);
-      if (currentUserId != null) {
-        query = query.eq('user_id', currentUserId!);
+      dynamic res;
+      try {
+        var query = Supabase.instance.client
+            .from('attendance_logs')
+            .select('employee_name')
+            .gte('created_at', startOfDay);
+        if (currentUserId != null) {
+          query = query.eq('user_id', currentUserId!);
+        }
+        res = await query;
+      } catch (e) {
+        if (e.toString().contains('user_id')) {
+          res = await Supabase.instance.client
+              .from('attendance_logs')
+              .select('employee_name')
+              .gte('created_at', startOfDay);
+        } else {
+          rethrow;
+        }
       }
-      final res = await query;
 
       final remoteNamesToday = <String>{};
       for (final row in res) {
@@ -340,13 +352,24 @@ class SupabaseSyncService {
   Future<void> syncEmployeesFromRemote() async {
     if (!_isInitialized) return;
     try {
-      var query = Supabase.instance.client
-          .from('employees')
-          .select('id, name, embeddings, photo_url, created_at');
-      if (currentUserId != null) {
-        query = query.eq('user_id', currentUserId!);
+      dynamic res;
+      try {
+        var query = Supabase.instance.client
+            .from('employees')
+            .select('id, name, embeddings, photo_url, created_at');
+        if (currentUserId != null) {
+          query = query.eq('user_id', currentUserId!);
+        }
+        res = await query;
+      } catch (e) {
+        if (e.toString().contains('user_id')) {
+          res = await Supabase.instance.client
+              .from('employees')
+              .select('id, name, embeddings, photo_url, created_at');
+        } else {
+          rethrow;
+        }
       }
-      final res = await query;
 
       final List<Map<String, dynamic>> employeeList =
           List<Map<String, dynamic>>.from(res);
@@ -402,11 +425,25 @@ class SupabaseSyncService {
         payload['user_id'] = currentUserId;
       }
 
-      final res = await Supabase.instance.client
-          .from('employees')
-          .upsert(payload)
-          .select('id')
-          .maybeSingle();
+      dynamic res;
+      try {
+        res = await Supabase.instance.client
+            .from('employees')
+            .upsert(payload)
+            .select('id')
+            .maybeSingle();
+      } catch (e) {
+        if (e.toString().contains('user_id')) {
+          payload.remove('user_id');
+          res = await Supabase.instance.client
+              .from('employees')
+              .upsert(payload)
+              .select('id')
+              .maybeSingle();
+        } else {
+          rethrow;
+        }
+      }
 
       if (res != null && res['id'] != null) {
         final uuid = res['id'] as String;
@@ -483,9 +520,21 @@ class SupabaseSyncService {
           insertData['employee_id'] = punchItem.employeeId;
         }
 
-        await Supabase.instance.client.from('attendance_logs').insert(insertData);
-        debugPrint('Attendance for $employeeName pushed online to Supabase.');
-        pushedOnline = true;
+        try {
+          await Supabase.instance.client.from('attendance_logs').insert(insertData);
+          debugPrint('Attendance for $employeeName pushed online to Supabase.');
+          pushedOnline = true;
+        } catch (e) {
+          if (e.toString().contains('user_id')) {
+            insertData.remove('user_id');
+            try {
+              await Supabase.instance.client.from('attendance_logs').insert(insertData);
+              debugPrint('Attendance for $employeeName pushed online to Supabase without user_id.');
+              pushedOnline = true;
+            } catch (_) {}
+          }
+          if (!pushedOnline) rethrow;
+        }
       } catch (e) {
         debugPrint('Supabase online insert failed (offline mode activated): $e');
         pushedOnline = false;
@@ -549,7 +598,16 @@ class SupabaseSyncService {
           insertData['employee_id'] = punch.employeeId;
         }
 
-        await Supabase.instance.client.from('attendance_logs').insert(insertData);
+        try {
+          await Supabase.instance.client.from('attendance_logs').insert(insertData);
+        } catch (e) {
+          if (e.toString().contains('user_id')) {
+            insertData.remove('user_id');
+            await Supabase.instance.client.from('attendance_logs').insert(insertData);
+          } else {
+            rethrow;
+          }
+        }
         debugPrint('Offline punch for ${punch.employeeName} synced successfully.');
       } catch (e) {
         debugPrint('Failed to sync queued punch: $e');

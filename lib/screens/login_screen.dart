@@ -182,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Brand Headings
                   const Text(
-                    'FaceID Attendance',
+                    'A10D',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,

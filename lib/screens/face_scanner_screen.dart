@@ -381,6 +381,137 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     }
   }
 
+  /// Displays the Workspace Account modal dialog on top-right tap
+  Future<void> _showAccountDialog() async {
+    _wakeKiosk();
+    final email = SupabaseSyncService().currentUserEmail ?? 'Workspace Admin';
+    final device = SupabaseSyncService().kioskDeviceName;
+    final isOnline = SupabaseSyncService().isNetworkConnected.value;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131D33),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Color(0xFF1D4ED8), width: 1.2),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.manage_accounts_rounded, color: Colors.blueAccent, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'A10D Kiosk Account',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Enterprise Biometrics',
+                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+              ],
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.email_outlined, color: Colors.blueAccent, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          email,
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.tablet_android_rounded, color: Colors.cyanAccent, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          device,
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isOnline ? Colors.green.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isOnline ? 'ONLINE' : 'OFFLINE',
+                          style: TextStyle(
+                            color: isOnline ? Colors.greenAccent : Colors.redAccent,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Manage registered faces, export CSV logs, and view your fleet analytics on the A10D web portal at shwaansgaba.github.io/A10D/',
+              style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.3),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
+              foregroundColor: Colors.redAccent,
+              elevation: 0,
+              side: const BorderSide(color: Colors.redAccent, width: 1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _promptKioskLogout();
+            },
+            icon: const Icon(Icons.power_settings_new_rounded, size: 16),
+            label: const Text('Sign Out', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Kiosk Sign Out / Disconnect from Workspace
   Future<void> _promptKioskLogout() async {
     _wakeKiosk();
@@ -533,80 +664,85 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
                 ),
               ),
 
-              // 3b. Top-Left Reset Icon to Wipe Logs & Faces
+              // 4. Top-Right: Network Status Pill & Account Button
               Positioned(
                 top: 14,
-                left: 68,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _promptAdminReset,
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5), width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.restart_alt_rounded,
-                        color: Colors.redAccent,
-                        size: 26,
-                      ),
+                right: 14,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ValueListenableBuilder<int>(
+                      valueListenable: SupabaseSyncService().pendingOfflineQueueCount,
+                      builder: (context, count, _) {
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: SupabaseSyncService().isNetworkConnected,
+                          builder: (context, isOnline, _) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.55),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: !isOnline || count > 0 ? Colors.amberAccent : Colors.greenAccent,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color: !isOnline
+                                          ? Colors.redAccent
+                                          : (count > 0 ? Colors.amberAccent : Colors.greenAccent),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    !isOnline ? 'OFFLINE' : (count > 0 ? 'SYNCING ($count)' : 'ONLINE'),
+                                    style: TextStyle(
+                                      color: !isOnline
+                                          ? Colors.redAccent
+                                          : (count > 0 ? Colors.amberAccent : Colors.greenAccent),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
-                  ),
-                ),
-              ),
-
-              // 3c. Top-Left Kiosk Sign Out Icon
-              Positioned(
-                top: 14,
-                left: 122,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _promptKioskLogout,
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF1D4ED8).withValues(alpha: 0.6), width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.power_settings_new_rounded,
-                        color: Colors.blueAccent,
-                        size: 26,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // 4. Top-Right Offline Queue & Network Status Pill
-              Positioned(
-                top: 16,
-                right: 16,
-                child: ValueListenableBuilder<int>(
-                  valueListenable: SupabaseSyncService().pendingOfflineQueueCount,
-                  builder: (context, count, _) {
-                    return ValueListenableBuilder<bool>(
-                      valueListenable: SupabaseSyncService().isNetworkConnected,
-                      builder: (context, isOnline, _) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    const SizedBox(width: 8),
+                    // Top-Right Account Button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _showAccountDialog,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          padding: const EdgeInsets.all(9),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: !isOnline || count > 0 ? Colors.amberAccent : Colors.greenAccent,
-                              width: 1,
-                            ),
+                            color: const Color(0xFF1D4ED8).withValues(alpha: 0.35),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF1D4ED8), width: 1.2),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          child: const Icon(
+                            Icons.manage_accounts_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
                             children: [
                               Container(
                                 width: 7,
