@@ -446,7 +446,7 @@ async function handleLoginSubmit(e) {
   try {
     const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
     if (deletedList.includes(email)) {
-      showAuthAlert('This account has been permanently deleted. Please create a new account.');
+      showAuthAlert('This account was deleted. To re-use this email, click "Create an Account" to register fresh.', 'error');
       return;
     }
   } catch (_) {}
@@ -509,26 +509,31 @@ async function handleSignupStep1Submit(e) {
   safeCreateIcons();
 
   try {
-    // 1. Check if this email is already registered in Supabase
-    const { data: checkData, error: checkError } = await supabaseClient.auth.signInWithOtp({
-      email: pendingSignupEmail,
-      options: {
-        shouldCreateUser: false,
+    // 1. Check if this email was previously deleted or is an existing active account
+    const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
+    const isPreviouslyDeleted = deletedList.some(e => e.toLowerCase() === pendingSignupEmail.toLowerCase());
+
+    if (!isPreviouslyDeleted) {
+      const { data: checkData, error: checkError } = await supabaseClient.auth.signInWithOtp({
+        email: pendingSignupEmail,
+        options: {
+          shouldCreateUser: false,
+        }
+      });
+
+      if (!checkError) {
+        // Email is ALREADY registered and active in Supabase!
+        const loginEmailInput = document.getElementById('login-email');
+        if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
+
+        switchAuthMode('login');
+        showAuthAlert('This email is already registered. Please sign in with your password.', 'error');
+        return;
       }
-    });
-
-    if (!checkError) {
-      // Email is ALREADY registered in Supabase!
-      // Pre-fill the login email input and return to the login page as requested
-      const loginEmailInput = document.getElementById('login-email');
-      if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
-
-      switchAuthMode('login');
-      showAuthAlert('This email is already registered. Please sign in with your password.', 'error');
-      return;
     }
 
-    // 2. Email is not registered - proceed to send OTP code with shouldCreateUser: true
+    // 2. Either email is NOT registered, OR it was a deleted account ready for fresh signup.
+    // Proceed to dispatch OTP code with shouldCreateUser: true
     if (btn) {
       btn.innerHTML = '<span>Sending Code...</span>';
     }
@@ -660,20 +665,31 @@ async function handleSignupStep3Submit(e) {
   safeCreateIcons();
 
   try {
-    // 1. Set the user's permanent password in Supabase Auth
+    // 1. Set the user's permanent password in Supabase Auth & clear account_deleted metadata
     const { data, error } = await supabaseClient.auth.updateUser({
       password: pass1,
+      data: {
+        account_deleted: false,
+        recreated_at: new Date().toISOString()
+      }
     });
 
     if (error) throw error;
 
-    // 2. Clear signup flags
+    // 2. Remove email from local deleted accounts blacklist so it is completely fresh
+    try {
+      const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
+      const filtered = deletedList.filter(e => e.toLowerCase() !== pendingSignupEmail.toLowerCase());
+      localStorage.setItem('a10d_deleted_accounts', JSON.stringify(filtered));
+    } catch (_) {}
+
+    // 3. Clear signup flags
     isSignupInProgress = false;
     authMode = 'login';
     sessionStorage.removeItem('a10d_signup_in_progress');
     sessionStorage.removeItem('a10d_signup_email');
 
-    // 3. User now has a confirmed password set! Transition to dashboard or clean login
+    // 4. User now has a confirmed password set! Transition to dashboard
     const activeUser = data.user || (await supabaseClient.auth.getUser()).data.user;
     handleAuthSuccess(activeUser);
 
@@ -1537,30 +1553,38 @@ async function executeAccountDeletion() {
     try {
       await supabaseClient.from('kiosks').delete().eq('user_id', userId);
     } catch (_) {}
+
+    // 4. Call server-side SECURITY DEFINER RPC delete_user() to permanently purge user from auth.users
+    let rpcPurged = false;
+    try {
+      const { error: rpcError } = await supabaseClient.rpc('delete_user');
+      if (!rpcError) {
+        rpcPurged = true;
+        console.log('User record permanently purged from auth.users via database RPC.');
+      } else {
+        console.warn('delete_user RPC notice:', rpcError.message);
+      }
     } catch (e) {
-      console.warn('Kiosks delete error:', e.message);
+      console.warn('delete_user RPC execution notice:', e);
     }
 
-    // 4. Invalidate credentials permanently so old password can NEVER authenticate again
-    const unguessablePassword = 'DELETED_' + crypto.randomUUID() + '_' + Math.random().toString(36) + '_' + Date.now();
-    try {
-      await supabaseClient.auth.updateUser({
-        password: unguessablePassword,
-        data: {
-          account_deleted: true,
-          deleted_at: new Date().toISOString()
-        }
-      });
-    } catch (e) {
-      console.warn('Credentials invalidation notice:', e.message);
+    // 5. If RPC is not yet enabled, scramble credentials and flag account_deleted in metadata
+    if (!rpcPurged) {
+      const unguessablePassword = 'DELETED_' + crypto.randomUUID() + '_' + Math.random().toString(36) + '_' + Date.now();
+      try {
+        await supabaseClient.auth.updateUser({
+          password: unguessablePassword,
+          data: {
+            account_deleted: true,
+            deleted_at: new Date().toISOString()
+          }
+        });
+      } catch (e) {
+        console.warn('Credentials invalidation notice:', e.message);
+      }
     }
 
-    // 5. Try RPC delete_user if supported on Supabase
-    try {
-      await supabaseClient.rpc('delete_user');
-    } catch (_) {}
-
-    // 6. Record in local deleted accounts list
+    // 6. Record in local deleted accounts list so signup knows this email can be re-registered
     try {
       const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
       if (userEmail && !deletedList.includes(userEmail)) {
@@ -1570,7 +1594,9 @@ async function executeAccountDeletion() {
     } catch (_) {}
 
     // 7. Sign out permanently
-    await supabaseClient.auth.signOut();
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (_) {}
 
     // 5. Clear all local tenant state
     currentAuthUser = null;
