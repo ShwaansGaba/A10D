@@ -222,40 +222,25 @@ function switchAuthMode(mode) {
 
   const tabLogin = document.getElementById('tab-btn-login');
   const tabSignup = document.getElementById('tab-btn-signup');
-  const tabLoginIcon = document.getElementById('tab-login-icon');
-  const tabLoginArrow = document.getElementById('tab-login-arrow');
-  const tabSignupIcon = document.getElementById('tab-signup-icon');
-
   const viewLogin = document.getElementById('auth-view-login');
   const viewSignup1 = document.getElementById('auth-view-signup-1');
   const viewSignup2 = document.getElementById('auth-view-signup-2');
   const viewSignup3 = document.getElementById('auth-view-signup-3');
 
+  const activePill = 'py-2 rounded-lg text-center transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm cursor-pointer font-semibold';
+  const inactivePill = 'py-2 rounded-lg text-center transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer font-medium';
+
   if (mode === 'login') {
-    if (tabLogin) {
-      tabLogin.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg cursor-pointer';
-    }
-    if (tabSignup) {
-      tabSignup.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10 cursor-pointer';
-    }
-    if (tabLoginIcon) tabLoginIcon.className = 'text-blue-600';
-    if (tabLoginArrow) tabLoginArrow.className = 'text-blue-600';
-    if (tabSignupIcon) tabSignupIcon.className = 'text-blue-300';
+    if (tabLogin) tabLogin.className = activePill;
+    if (tabSignup) tabSignup.className = inactivePill;
 
     if (viewLogin) viewLogin.classList.remove('hidden');
     if (viewSignup1) viewSignup1.classList.add('hidden');
     if (viewSignup2) viewSignup2.classList.add('hidden');
     if (viewSignup3) viewSignup3.classList.add('hidden');
   } else {
-    if (tabSignup) {
-      tabSignup.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-between bg-white text-blue-950 shadow-lg cursor-pointer';
-    }
-    if (tabLogin) {
-      tabLogin.className = 'w-full text-left px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-between text-blue-100 hover:bg-white/10 border border-white/10 cursor-pointer';
-    }
-    if (tabSignupIcon) tabSignupIcon.className = 'text-blue-600';
-    if (tabLoginIcon) tabLoginIcon.className = 'text-blue-300';
-    if (tabLoginArrow) tabLoginArrow.className = 'text-blue-300';
+    if (tabSignup) tabSignup.className = activePill;
+    if (tabLogin) tabLogin.className = inactivePill;
 
     goToSignupStep(1);
   }
@@ -287,7 +272,6 @@ function goToSignupStep(step) {
     startResendCountdown();
   } else if (step === 3) {
     if (viewSignup3) viewSignup3.classList.remove('hidden');
-    resetCaptchaSlider();
   }
   safeCreateIcons();
 }
@@ -339,14 +323,14 @@ function showAuthAlert(msg, type = 'error') {
   box.classList.remove('hidden');
   text.innerText = msg;
   if (type === 'success') {
-    box.className = 'mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-center space-x-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400';
+    box.className = 'mb-4 p-3 rounded-xl text-xs font-medium flex items-start space-x-2.5 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
     if (icon) {
-      icon.innerHTML = `<svg class="w-4 h-4 shrink-0 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
+      icon.innerHTML = `<svg class="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
     }
   } else {
-    box.className = 'mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-center space-x-2 bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400';
+    box.className = 'mb-4 p-3 rounded-xl text-xs font-medium flex items-start space-x-2.5 bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
     if (icon) {
-      icon.innerHTML = `<svg class="w-4 h-4 shrink-0 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+      icon.innerHTML = `<svg class="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
     }
   }
 }
@@ -375,7 +359,7 @@ async function handleLoginSubmit(e) {
   const originalHtml = btn.innerHTML;
 
   btn.disabled = true;
-  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Signing In...</span>';
+  btn.innerHTML = '<span>Signing In...</span>';
   safeCreateIcons();
 
   try {
@@ -417,11 +401,11 @@ async function handleSignupStep1Submit(e) {
   const btn = document.getElementById('signup-1-btn');
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Sending Code...</span>';
+  btn.innerHTML = '<span>Sending Code...</span>';
   safeCreateIcons();
 
   try {
-    // Send 6-digit OTP code to the email using Supabase Auth signInWithOtp
+    // Send OTP code to the email using Supabase Auth signInWithOtp
     const redirectUrl = window.location.origin ? (window.location.origin + window.location.pathname) : undefined;
     const { data, error } = await supabaseClient.auth.signInWithOtp({
       email: pendingSignupEmail,
@@ -447,22 +431,22 @@ async function handleSignupStep1Submit(e) {
   }
 }
 
-// Sign Up - Step 2: Verify 6-Digit OTP
+// Sign Up - Step 2: Verify 6 or 8-Digit OTP
 async function handleSignupStep2Submit(e) {
   e.preventDefault();
   hideAuthAlert();
   if (!supabaseClient) return;
 
   const otp = getEnteredOtp();
-  if (otp.length < 6) {
-    showAuthAlert('Please enter the full 6-digit verification code.');
+  if (!otp || otp.length < 6) {
+    showAuthAlert('Please enter the full verification code from your email (at least 6 digits).');
     return;
   }
 
   const btn = document.getElementById('signup-2-btn');
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Verifying...</span>';
+  btn.innerHTML = '<span>Verifying Code...</span>';
   safeCreateIcons();
 
   try {
@@ -493,7 +477,7 @@ async function handleSignupStep2Submit(e) {
     goToSignupStep(3);
   } catch (err) {
     console.error('OTP Verify Error:', err);
-    showAuthAlert(err.message || 'Invalid or expired verification code. Please try again.');
+    showAuthAlert(err.message || 'Invalid or expired verification code. Please check your email and try again.');
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
@@ -501,7 +485,7 @@ async function handleSignupStep2Submit(e) {
   }
 }
 
-// Sign Up - Step 3: Set Password & Validate Captcha
+// Sign Up - Step 3: Set Password & Authorize Admin
 async function handleSignupStep3Submit(e) {
   e.preventDefault();
   hideAuthAlert();
@@ -520,15 +504,16 @@ async function handleSignupStep3Submit(e) {
     return;
   }
 
-  if (!isCaptchaVerified) {
-    showAuthAlert('Please complete the slide verification challenge.');
+  const humanCheck = document.getElementById('human-verify-check');
+  if (humanCheck && !humanCheck.checked) {
+    showAuthAlert('Please check the authorization confirmation box to proceed.');
     return;
   }
 
   const btn = document.getElementById('signup-3-btn');
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Activating Workspace...</span>';
+  btn.innerHTML = '<span>Activating Workspace...</span>';
   safeCreateIcons();
 
   try {
@@ -546,7 +531,7 @@ async function handleSignupStep3Submit(e) {
     switchAuthMode('login');
     const loginEmailInput = document.getElementById('login-email');
     if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
-    showAuthAlert('🎉 Workspace successfully registered and verified! Please log in with your password.', 'success');
+    showAuthAlert('🎉 Workspace successfully registered and verified! Please sign in with your password.', 'success');
   } catch (err) {
     console.error('Password Update Error:', err);
     showAuthAlert(err.message || 'Failed to finalize account password. Please try again.');
@@ -568,10 +553,10 @@ async function resendOtpCode() {
       email: pendingSignupEmail,
       options: { shouldCreateUser: true }
     });
-    showAuthAlert('A fresh 6-digit code has been sent to your email.', 'success');
+    showAuthAlert('A fresh verification code has been sent to your email.', 'success');
     startResendCountdown();
   } catch (err) {
-    showAuthAlert(err.message || 'Could not resend OTP code.');
+    showAuthAlert(err.message || 'Could not resend code.');
   }
 }
 
@@ -598,50 +583,47 @@ function startResendCountdown() {
   }, 1000);
 }
 
-// OTP Input Boxes Multi-Box Handler
+// Universal OTP Input Handler (Supports 6, 7, 8, 10 digits seamlessly)
 function initOtpBoxHandlers() {
-  const boxes = document.querySelectorAll('.otp-box');
-  boxes.forEach((box, index) => {
-    box.addEventListener('input', (e) => {
-      const val = e.target.value.replace(/[^0-9]/g, '');
-      e.target.value = val ? val[0] : '';
-      if (val && index < boxes.length - 1) {
-        boxes[index + 1].focus();
-      }
-    });
+  const input = document.getElementById('signup-otp-input');
+  if (!input) return;
 
-    box.addEventListener('keydown', (e) => {
-      if (e.key === 'Backspace' && !e.target.value && index > 0) {
-        boxes[index - 1].focus();
-      }
-    });
+  input.addEventListener('input', (e) => {
+    const clean = e.target.value.replace(/[^0-9]/g, '');
+    e.target.value = clean;
+  });
 
-    box.addEventListener('paste', (e) => {
-      e.preventDefault();
-      const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
-      if (!pasteData) return;
-      for (let i = 0; i < boxes.length; i++) {
-        boxes[i].value = pasteData[i] || '';
-      }
-      const nextFocus = Math.min(pasteData.length, boxes.length - 1);
-      boxes[nextFocus].focus();
-    });
+  input.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
+    input.value = pasteData;
   });
 }
 
 function getEnteredOtp() {
+  const input = document.getElementById('signup-otp-input');
+  if (input) {
+    return input.value.replace(/[^0-9]/g, '').trim();
+  }
   const boxes = document.querySelectorAll('.otp-box');
   let code = '';
   boxes.forEach((b) => (code += b.value));
-  return code;
+  return code.trim();
 }
 
 function clearOtpBoxes() {
+  const input = document.getElementById('signup-otp-input');
+  if (input) input.value = '';
   const boxes = document.querySelectorAll('.otp-box');
   boxes.forEach((b) => (b.value = ''));
 }
 
 function focusFirstOtpBox() {
+  const input = document.getElementById('signup-otp-input');
+  if (input) {
+    setTimeout(() => input.focus(), 150);
+    return;
+  }
   const first = document.querySelector('.otp-box[data-idx="0"]');
   if (first) setTimeout(() => first.focus(), 150);
 }
