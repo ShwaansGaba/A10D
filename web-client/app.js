@@ -1261,6 +1261,26 @@ function switchSidebarTab(tab) {
   safeCreateIcons();
 }
 
+// Helper: Format ISO string to readable local time (HH:MM AM/PM)
+function formatLocalTime(isoStr) {
+  if (!isoStr) return '--:--';
+  try {
+    const d = new Date(isoStr);
+    return isNaN(d.getTime()) ? '--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (_) {
+    return '--:--';
+  }
+}
+
+// Helper: Check if a kiosk device heartbeat is active (within last 15 minutes or via presence)
+function isKioskHeartbeatActive(k) {
+  if (!k) return false;
+  if (k.is_presence_online) return true;
+  if (k.is_active === false) return false;
+  const hb = new Date(k.last_heartbeat || k.created_at || 0).getTime();
+  return (Date.now() - hb) < (15 * 60 * 1000);
+}
+
 function renderSidebarActivity() {
   const container = document.getElementById('sidebar-activity-list');
   if (!container) return;
@@ -1281,7 +1301,7 @@ function renderSidebarActivity() {
       const name = escapeHtml(log.employee_name || 'Staff');
       const time = formatLocalTime(log.created_at);
       const isLate = isPunchLate(new Date(log.created_at));
-      const device = escapeHtml(log.device_name || 'Kiosk');
+      const device = escapeHtml(log.device_name || log.device_id || 'Kiosk');
       const initial = name[0] ? name[0].toUpperCase() : 'S';
 
       return `
@@ -1365,9 +1385,11 @@ async function handleSaveAccountProfile(e) {
   if (!supabaseClient || !currentAuthUser) return;
 
   const btn = document.getElementById('account-save-profile-btn');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span>Saving...</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Save Changes</span>';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Saving...</span>';
+  }
 
   const fullName = document.getElementById('account-fullname').value.trim();
   const companyName = document.getElementById('account-company').value.trim();
@@ -1405,8 +1427,10 @@ async function handleSaveAccountProfile(e) {
     console.error('Save Profile Error:', err);
     alert('Failed to update workspace profile: ' + err.message);
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     safeCreateIcons();
   }
 }
@@ -1428,9 +1452,11 @@ async function handleUpdatePassword(e) {
   }
 
   const btn = document.getElementById('account-update-password-btn');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span>Updating...</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Update Password</span>';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Updating...</span>';
+  }
 
   try {
     const { data, error } = await supabaseClient.auth.updateUser({
@@ -1445,8 +1471,10 @@ async function handleUpdatePassword(e) {
     console.error('Password Update Error:', err);
     alert('Failed to update password: ' + err.message);
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     safeCreateIcons();
   }
 }
@@ -1475,9 +1503,11 @@ async function executeAccountDeletion() {
   if (!supabaseClient || !currentAuthUser) return;
 
   const btn = document.getElementById('delete-account-btn');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span>Deleting Account & Data...</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Delete Workspace & Account</span>';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Deleting Account & Data...</span>';
+  }
 
   try {
     const userId = currentAuthUser.id;
@@ -1485,21 +1515,28 @@ async function executeAccountDeletion() {
 
     // 1. Delete all attendance logs for this user/tenant
     try {
-      await supabaseClient.from('attendance_logs').delete().eq('user_id', userId);
+      const logIds = (attendanceLogs || []).map(l => l.id).filter(Boolean);
+      if (logIds.length > 0) {
+        await supabaseClient.from('attendance_logs').delete().in('id', logIds);
+      }
     } catch (e) {
       console.warn('Attendance logs delete error:', e.message);
     }
 
     // 2. Delete all employees and facial profiles for this user/tenant
     try {
-      await supabaseClient.from('employees').delete().eq('user_id', userId);
+      const empIds = (employeesList || []).map(e => e.id).filter(Boolean);
+      if (empIds.length > 0) {
+        await supabaseClient.from('employees').delete().in('id', empIds);
+      }
     } catch (e) {
       console.warn('Employees delete error:', e.message);
     }
 
-    // 3. Delete all kiosks for this user/tenant
+    // 3. Delete all kiosks for this user/tenant (if table exists)
     try {
       await supabaseClient.from('kiosks').delete().eq('user_id', userId);
+    } catch (_) {}
     } catch (e) {
       console.warn('Kiosks delete error:', e.message);
     }
@@ -1552,8 +1589,10 @@ async function executeAccountDeletion() {
     console.error('Account Deletion Error:', err);
     alert('Account deletion encountered an issue: ' + err.message);
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     safeCreateIcons();
   }
 }
@@ -2768,8 +2807,10 @@ async function executeTotalReset() {
   } catch (err) {
     alert('Reset encountered an issue: ' + err.message);
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
     safeCreateIcons();
   }
 }
@@ -2810,5 +2851,6 @@ function renderSampleDemoData() {
 }
 
 function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s]);
 }
