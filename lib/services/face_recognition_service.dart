@@ -154,6 +154,8 @@ class FaceRecognitionService {
 
     users.removeWhere((u) => u.id == userId);
     await prefs.setStringList(_usersKey, users.map((u) => u.toJson()).toList());
+    await cleanCache();
+    await SupabaseSyncService().deleteEmployee(userId);
   }
 
   /// Completely wipe all registered face profiles and photos locally
@@ -177,19 +179,29 @@ class FaceRecognitionService {
     debugPrint('FaceRecognitionService: All local face data wiped.');
   }
 
-  /// Live-sync local face cache with remote employees from Supabase (True Bidirectional)
+  /// Live-sync local face cache with remote employees from Supabase (Authoritative Remote Sync)
   Future<void> syncFromRemoteEmployees(List<Map<String, dynamic>> remoteEmployees) async {
     final prefs = await SharedPreferences.getInstance();
     final localUsers = await getRegisteredUsers();
 
     // 1. If remoteEmployees is empty:
-    // NEVER wipe local face data! If localUsers has profiles, push them up to Supabase!
+    // When logged into Supabase, an empty list means all employees were deleted or database reset!
+    // We MUST clear the local cache so deleted employees are never resurrected or scanned!
     if (remoteEmployees.isEmpty) {
-      if (localUsers.isNotEmpty) {
-        debugPrint('Remote employee list is empty. Pushing ${localUsers.length} local profiles to Supabase...');
+      if (SupabaseSyncService().isUserLoggedIn) {
+        debugPrint('Remote employee roster is empty. Purging local face database to match cloud state...');
         for (final user in localUsers) {
-          SupabaseSyncService().syncEmployee(user);
+          if (user.photoPath.isNotEmpty) {
+            try {
+              final f = File(user.photoPath);
+              if (f.existsSync()) f.deleteSync();
+            } catch (_) {}
+          }
         }
+        await prefs.remove(_usersKey);
+        await prefs.remove('registered_attendance_faces_v2');
+        await cleanCache();
+        debugPrint('Local face database purged completely to match server.');
       }
       return;
     }
@@ -203,16 +215,23 @@ class FaceRecognitionService {
         .whereType<String>()
         .toSet();
 
-    // 2. Ensure all local users are preserved. If any local user is missing from remote, push to remote!
+    // 2. Filter localUsers: ONLY KEEP users that still exist on Supabase!
+    // If a user was deleted on the web or another terminal, REMOVE them from this device immediately!
     final updatedList = <RegisteredUser>[];
     for (final user in localUsers) {
       final matchesName = remoteNames.contains(user.name.trim().toLowerCase());
       final matchesId = remoteIds.contains(user.id);
-      updatedList.add(user);
 
-      if (!matchesName && !matchesId) {
-        debugPrint('Local employee ${user.name} not found on Supabase. Syncing up to cloud...');
-        SupabaseSyncService().syncEmployee(user);
+      if (matchesName || matchesId) {
+        updatedList.add(user);
+      } else {
+        debugPrint('Employee ${user.name} was removed on server. Deleting from local face cache...');
+        if (user.photoPath.isNotEmpty) {
+          try {
+            final f = File(user.photoPath);
+            if (f.existsSync()) f.deleteSync();
+          } catch (_) {}
+        }
       }
     }
 

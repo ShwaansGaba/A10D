@@ -133,11 +133,13 @@ class SupabaseSyncService {
         }
       });
 
-      // Always register active kiosk & subscribe to presence fleet
-      await registerKioskOnline();
-      _subscribeToRealtimeChanges();
-      await _syncTodayPunchesFromRemote();
-      await syncEmployeesFromRemote();
+      // Only register active kiosk & sync if user is authenticated!
+      if (isUserLoggedIn) {
+        await registerKioskOnline();
+        _subscribeToRealtimeChanges();
+        await _syncTodayPunchesFromRemote();
+        await syncEmployeesFromRemote();
+      }
     } catch (e) {
       debugPrint('Supabase initialization warning: $e');
     }
@@ -176,7 +178,8 @@ class SupabaseSyncService {
   }
 
   Future<void> registerKioskOnline([String? customName]) async {
-    if (!_isInitialized) return;
+    // Only register online if the user is authenticated with a valid tenant account
+    if (!_isInitialized || !isUserLoggedIn || currentUserId == null) return;
     try {
       if (customName != null && customName.trim().isNotEmpty) {
         final prefs = await SharedPreferences.getInstance();
@@ -185,10 +188,12 @@ class SupabaseSyncService {
       }
       final devId = await getDeviceId();
       final devName = await getDeviceName();
+      final tenantId = currentUserId!;
+      final channelName = 'presence_kiosks_$tenantId';
 
-      // 1. Join Realtime Presence Fleet Channel (Instant 0ms live broadcast across mobile & web!)
+      // 1. Join Tenant-Specific Realtime Presence Fleet Channel
       if (_presenceChannel == null) {
-        _presenceChannel = Supabase.instance.client.channel('kiosk-fleet-presence');
+        _presenceChannel = Supabase.instance.client.channel(channelName);
         _presenceChannel!.subscribe((status, error) async {
           if (status == RealtimeSubscribeStatus.subscribed) {
             await _trackKioskPresence(devId, devName);
@@ -205,11 +210,9 @@ class SupabaseSyncService {
           'device_name': devName,
           'platform': 'Android Phone',
           'is_active': true,
+          'user_id': tenantId,
           'last_heartbeat': DateTime.now().toUtc().toIso8601String(),
         };
-        if (currentUserId != null) {
-          kioskData['user_id'] = currentUserId;
-        }
         try {
           await Supabase.instance.client.from('kiosks').upsert(kioskData);
         } catch (_) {
@@ -218,7 +221,7 @@ class SupabaseSyncService {
         }
       } catch (_) {}
 
-      debugPrint('Kiosk registered active in cloud: $devName ($devId)');
+      debugPrint('Kiosk registered active in cloud for tenant $tenantId: $devName ($devId)');
       _startKioskHeartbeat();
     } catch (e) {
       debugPrint('Error registering kiosk online: $e');
@@ -226,6 +229,7 @@ class SupabaseSyncService {
   }
 
   Future<void> _trackKioskPresence(String devId, String devName) async {
+    if (!isUserLoggedIn || currentUserId == null) return;
     try {
       await _presenceChannel?.track({
         'device_id': devId,
@@ -267,8 +271,11 @@ class SupabaseSyncService {
 
   Future<void> logout() async {
     _kioskHeartbeatTimer?.cancel();
+    _kioskHeartbeatTimer = null;
     try {
       await _presenceChannel?.untrack();
+      _presenceChannel?.unsubscribe();
+      _presenceChannel = null;
     } catch (_) {}
     if (_isInitialized) {
       try {
@@ -287,6 +294,7 @@ class SupabaseSyncService {
     } catch (_) {}
     _alreadyPunchedTodaySet.clear();
     _employeeUuidCache.clear();
+    await FaceRecognitionService().resetAllFaceData();
   }
 
   void onUserLoggedIn() {
@@ -385,12 +393,27 @@ class SupabaseSyncService {
   Future<void> syncEmployeesFromRemote() async {
     if (!_isInitialized) return;
     try {
-      final res = await Supabase.instance.client
-          .from('employees')
-          .select('id, name, embeddings, photo_url, created_at');
-
-      final List<Map<String, dynamic>> employeeList =
-          List<Map<String, dynamic>>.from(res);
+      List<Map<String, dynamic>> employeeList = [];
+      try {
+        if (currentUserId != null) {
+          final res = await Supabase.instance.client
+              .from('employees')
+              .select('id, name, embeddings, photo_url, created_at')
+              .eq('user_id', currentUserId!);
+          employeeList = List<Map<String, dynamic>>.from(res);
+        } else {
+          final res = await Supabase.instance.client
+              .from('employees')
+              .select('id, name, embeddings, photo_url, created_at');
+          employeeList = List<Map<String, dynamic>>.from(res);
+        }
+      } catch (_) {
+        // Fallback if user_id column does not exist in schema
+        final res = await Supabase.instance.client
+            .from('employees')
+            .select('id, name, embeddings, photo_url, created_at');
+        employeeList = List<Map<String, dynamic>>.from(res);
+      }
 
       _employeeUuidCache.clear();
       for (final item in employeeList) {
@@ -399,11 +422,22 @@ class SupabaseSyncService {
         }
       }
 
-      // Sync with Face Recognition biometric engine (bidirectional)
+      // Sync with Face Recognition biometric engine (authoritative remote sync)
       await FaceRecognitionService().syncFromRemoteEmployees(employeeList);
       debugPrint('Employees synced with Supabase: ${employeeList.length} active employee profiles.');
     } catch (e) {
       debugPrint('Sync employees from remote notice: $e');
+    }
+  }
+
+  /// Delete an employee from Supabase
+  Future<void> deleteEmployee(String employeeId) async {
+    if (!_isInitialized) return;
+    try {
+      await Supabase.instance.client.from('employees').delete().eq('id', employeeId);
+      debugPrint('Employee $employeeId deleted from Supabase.');
+    } catch (e) {
+      debugPrint('Delete employee error: $e');
     }
   }
 
