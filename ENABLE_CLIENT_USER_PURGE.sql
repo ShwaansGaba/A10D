@@ -23,12 +23,14 @@ DECLARE
   current_user_id uuid := auth.uid();
 BEGIN
   IF current_user_id IS NOT NULL THEN
-    -- 1. Delete all attendance logs associated with employees
+    -- 1. Delete all attendance logs for this tenant's employees
     DELETE FROM public.attendance_logs 
-    WHERE employee_id IN (SELECT id FROM public.employees);
+    WHERE user_id = current_user_id 
+       OR employee_id IN (SELECT id FROM public.employees WHERE user_id = current_user_id);
 
-    -- 2. Delete all enrolled employees
-    DELETE FROM public.employees;
+    -- 2. Delete all enrolled employees for this tenant
+    DELETE FROM public.employees 
+    WHERE user_id = current_user_id;
 
     -- 3. Delete from kiosks if table exists
     BEGIN
