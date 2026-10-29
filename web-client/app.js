@@ -1195,8 +1195,8 @@ function switchTab(tab) {
   }
 
   // Active / Inactive dock tab button classes
-  const activeClass = 'w-full flex items-center space-x-3.5 px-4 py-3 rounded-2xl bg-white text-[#5D50A2] shadow-lg shadow-black/10 font-bold text-sm cursor-pointer transition-all';
-  const inactiveClass = 'w-full flex items-center space-x-3.5 px-4 py-3 rounded-2xl text-purple-200 hover:text-white hover:bg-white/10 font-medium text-sm cursor-pointer transition-all';
+  const activeClass = 'w-full flex items-center space-x-3.5 px-4 py-3 rounded-2xl bg-white text-[#167BB0] shadow-lg shadow-black/10 font-bold text-sm cursor-pointer transition-all';
+  const inactiveClass = 'w-full flex items-center space-x-3.5 px-4 py-3 rounded-2xl text-sky-100 hover:text-white hover:bg-white/10 font-medium text-sm cursor-pointer transition-all';
 
   // Toggle views
   Object.keys(views).forEach(key => {
@@ -1294,10 +1294,10 @@ function switchSidebarTab(tab) {
   const btnKiosks = document.getElementById('sidebar-tab-kiosks');
 
   if (tab === 'act') {
-    if (btnAct) btnAct.className = 'py-1.5 rounded-lg text-center bg-[#5D50A2] text-white font-semibold shadow-sm transition-all cursor-pointer';
+    if (btnAct) btnAct.className = 'py-1.5 rounded-lg text-center bg-[#167BB0] text-white font-semibold shadow-sm transition-all cursor-pointer';
     if (btnKiosks) btnKiosks.className = 'py-1.5 rounded-lg text-center text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 transition-all cursor-pointer';
   } else {
-    if (btnKiosks) btnKiosks.className = 'py-1.5 rounded-lg text-center bg-[#5D50A2] text-white font-semibold shadow-sm transition-all cursor-pointer';
+    if (btnKiosks) btnKiosks.className = 'py-1.5 rounded-lg text-center bg-[#167BB0] text-white font-semibold shadow-sm transition-all cursor-pointer';
     if (btnAct) btnAct.className = 'py-1.5 rounded-lg text-center text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 transition-all cursor-pointer';
   }
 
@@ -1333,7 +1333,7 @@ function renderSidebarActivity() {
     if (!attendanceLogs || attendanceLogs.length === 0) {
       container.innerHTML = `
         <div class="text-center py-6 text-xs text-slate-400">
-          <i data-lucide="clock" class="w-5 h-5 mx-auto mb-1.5 text-purple-300"></i>
+          <i data-lucide="clock" class="w-5 h-5 mx-auto mb-1.5 text-sky-400"></i>
           <span>No punches recorded yet</span>
         </div>`;
       safeCreateIcons();
@@ -1349,9 +1349,9 @@ function renderSidebarActivity() {
       const initial = name[0] ? name[0].toUpperCase() : 'S';
 
       return `
-        <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-purple-50/50 dark:hover:bg-slate-800 transition-colors">
+        <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-sky-50/50 dark:hover:bg-slate-800 transition-colors">
           <div class="flex items-center space-x-3 min-w-0">
-            <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-[#5D50A2] to-[#FF5C7E] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-[#167BB0] to-[#1D93CA] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
               ${initial}
             </div>
             <div class="min-w-0">
@@ -1371,7 +1371,7 @@ function renderSidebarActivity() {
     if (!activeKiosksList || activeKiosksList.length === 0) {
       container.innerHTML = `
         <div class="text-center py-6 text-xs text-slate-400">
-          <i data-lucide="smartphone" class="w-5 h-5 mx-auto mb-1.5 text-purple-300"></i>
+          <i data-lucide="smartphone" class="w-5 h-5 mx-auto mb-1.5 text-sky-400"></i>
           <span>No hardware kiosks registered</span>
         </div>`;
       safeCreateIcons();
@@ -1384,9 +1384,9 @@ function renderSidebarActivity() {
       const active = isKioskHeartbeatActive(k);
 
       return `
-        <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-purple-50/50 dark:hover:bg-slate-800 transition-colors">
+        <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-sky-50/50 dark:hover:bg-slate-800 transition-colors">
           <div class="flex items-center space-x-3 min-w-0">
-            <div class="w-9 h-9 rounded-2xl bg-[#5D50A2]/15 text-[#5D50A2] dark:text-purple-300 flex items-center justify-center shrink-0">
+            <div class="w-9 h-9 rounded-2xl bg-[#167BB0]/15 text-[#167BB0] dark:text-sky-300 flex items-center justify-center shrink-0">
               <i data-lucide="tablet" class="w-4 h-4"></i>
             </div>
             <div class="min-w-0">
