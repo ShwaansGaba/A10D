@@ -480,18 +480,22 @@
           <!-- ============================================== -->
           <div id="view-dashboard" class="space-y-6">
 
-            <!-- 1. LIVE ATTENDANCE STREAM PANEL (REPLACES GRAPH AS REQUESTED) -->
+            <!-- 1. TODAY'S ATTENDANCE STREAM PANEL (RESETS DAILY) -->
             <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
                 <div class="flex items-center space-x-3">
                   <i data-lucide="activity" class="w-5 h-5 text-[#167BB0]"></i>
                   <div>
-                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">Live Attendance Stream</h2>
-                    <p class="text-xs text-slate-400">Realtime attendance punches from Android Kiosks & Web Terminals</p>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">Today's Attendance Stream</h2>
+                    <p class="text-xs text-slate-400">Live attendance stream for today &bull; Resets daily</p>
                   </div>
                 </div>
 
                 <div class="flex items-center space-x-2">
+                  <button onclick="switchTab('live')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-gray-200 border border-slate-200 dark:border-slate-700 flex items-center space-x-1.5 transition-all" title="View historical punch records">
+                    <i data-lucide="history" class="w-3.5 h-3.5"></i>
+                    <span>View History</span>
+                  </button>
                   <button onclick="openManualPunchModal()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#167BB0] text-white hover:bg-[#126490] flex items-center space-x-1.5 transition-all shadow-sm">
                     <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
                     <span>Manual Punch</span>
@@ -636,7 +640,7 @@
           </div>
 
           <!-- ============================================== -->
-          <!-- VIEW 1: LIVE ATTENDANCE STREAM (FULL VIEW) -->
+          <!-- VIEW 1: LIVE ATTENDANCE STREAM & HISTORY -->
           <!-- ============================================== -->
           <div id="view-live" class="hidden space-y-5">
             <div class="bg-white dark:bg-[#151B28] rounded-[28px] p-6 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
@@ -644,15 +648,25 @@
                 <div class="flex items-center space-x-3">
                   <i data-lucide="clock" class="w-5 h-5 text-[#167BB0]"></i>
                   <div>
-                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">Historical Attendance Logs</h2>
-                    <p class="text-xs text-slate-400">Complete archive of attendance punch records</p>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">Attendance Stream & Records</h2>
+                    <p class="text-xs text-slate-400">View live punches today or select any past date to browse historical logs</p>
                   </div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2.5">
+                  <!-- Date Filter Controls -->
+                  <div class="flex items-center space-x-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5">
+                    <span class="text-[11px] font-semibold text-slate-400">Date:</span>
+                    <input id="live-feed-date-picker" onchange="filterAttendanceLogs()" type="date" class="bg-transparent text-xs text-slate-900 dark:text-white focus:outline-none cursor-pointer">
+                  </div>
+
+                  <button type="button" id="live-feed-btn-today" onclick="setLiveFeedDate('today')" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0]/10 text-[#167BB0] hover:bg-[#167BB0]/20 border border-[#167BB0]/30 transition-all">Today</button>
+
+                  <button type="button" id="live-feed-btn-all" onclick="setLiveFeedDate('all')" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all">All Dates</button>
+
                   <div class="relative">
                     <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-                    <input id="search-attendance" oninput="filterAttendanceLogs()" type="text" placeholder="Filter employee..." class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#1D93CA] w-40 sm:w-48">
+                    <input id="search-attendance" oninput="filterAttendanceLogs()" type="text" placeholder="Search employee..." class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#1D93CA] w-36 sm:w-44">
                   </div>
 
                   <button onclick="openManualPunchModal()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#167BB0] text-white hover:bg-[#126490] flex items-center space-x-1.5 transition-all shadow-sm">
@@ -1060,6 +1074,11 @@
         </div>
 
         <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Phone Number</label>
+          <input id="new-emp-phone" type="tel" placeholder="e.g. +91 98765 43210" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#1D93CA]">
+        </div>
+
+        <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Employee Code / ID</label>
           <input id="new-emp-code" type="text" placeholder="e.g. EMP-101" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-[#1D93CA]">
         </div>
@@ -1229,6 +1248,7 @@
           </button>
         </div>
         <pre id="rls-sql-code" class="text-xs font-mono text-amber-300 overflow-x-auto whitespace-pre-wrap select-all">ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS user_id uuid;
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS phone text;
 ALTER TABLE public.attendance_logs ADD COLUMN IF NOT EXISTS user_id uuid;
 ALTER TABLE public.kiosks ADD COLUMN IF NOT EXISTS user_id uuid;
 ALTER TABLE public.attendance_logs DISABLE ROW LEVEL SECURITY;

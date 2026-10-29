@@ -49,10 +49,15 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('a10d_deleted_accounts');
   } catch (_) {}
 
-  // Set default summary date picker to today
+  // Set default summary and live feed date pickers to today
+  const todayYmd = new Date().toISOString().slice(0, 10);
   const summaryPicker = document.getElementById('summary-date-picker');
   if (summaryPicker) {
-    summaryPicker.value = new Date().toISOString().slice(0, 10);
+    summaryPicker.value = todayYmd;
+  }
+  const liveFeedPicker = document.getElementById('live-feed-date-picker');
+  if (liveFeedPicker) {
+    liveFeedPicker.value = todayYmd;
   }
 
   initOtpBoxHandlers();
@@ -1809,36 +1814,36 @@ function isEmployeePunchedToday(employeeName, employeeId) {
   });
 }
 
-// Render Attendance Logs Table
-function renderAttendanceLogs(logs) {
-  const tbody = document.getElementById('attendance-table-body');
-  const tbodyFull = document.getElementById('attendance-table-body-full');
-  if (!tbody && !tbodyFull) return;
+// Format date to local YYYY-MM-DD
+function formatLocalYMD(date) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
-  const emptyHtml = `
-    <tr>
-      <td colspan="6" class="py-12 text-center text-gray-500">
-        <div class="flex flex-col items-center justify-center space-y-2">
-          <i data-lucide="clock" class="w-8 h-8 text-gray-400 dark:text-gray-600"></i>
-          <p class="text-sm">No attendance records logged yet.</p>
-        </div>
-      </td>
-    </tr>
-  `;
-
+// Build standard HTML table rows for attendance records
+function buildAttendanceRowsHtml(logs, emptyTitle, emptySubtitle) {
   if (!logs || logs.length === 0) {
-    if (tbody) tbody.innerHTML = emptyHtml;
-    if (tbodyFull) tbodyFull.innerHTML = emptyHtml;
-    safeCreateIcons();
-    return;
+    return `
+      <tr>
+        <td colspan="6" class="py-12 text-center text-gray-500">
+          <div class="flex flex-col items-center justify-center space-y-2">
+            <i data-lucide="clock" class="w-8 h-8 text-gray-400 dark:text-gray-600"></i>
+            <p class="text-sm font-medium text-slate-700 dark:text-gray-300">${emptyTitle || 'No attendance records logged yet.'}</p>
+            ${emptySubtitle ? `<p class="text-xs text-slate-400 dark:text-gray-500">${emptySubtitle}</p>` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
   }
 
-  const rowsHtml = logs.map((log) => {
+  return logs.map((log) => {
     const dateObj = new Date(log.created_at);
     const timeFormatted = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const dateFormatted = dateObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     const late = isPunchLate(dateObj);
-    const confidencePct = Math.round((log.confidence || 0.95) * 100);
 
     return `
       <tr class="hover:bg-slate-50 dark:hover:bg-[#161E2A] transition-colors">
@@ -1884,9 +1889,52 @@ function renderAttendanceLogs(logs) {
       </tr>
     `;
   }).join('');
+}
 
-  if (tbody) tbody.innerHTML = rowsHtml;
-  if (tbodyFull) tbodyFull.innerHTML = rowsHtml;
+// Render Dashboard Attendance Stream (TODAY ONLY - Resets Every Day Automatically)
+function renderDashboardAttendance() {
+  const tbody = document.getElementById('attendance-table-body');
+  if (!tbody) return;
+
+  const todayStr = new Date().toDateString();
+  const todayLogs = (attendanceLogs || []).filter(log => new Date(log.created_at).toDateString() === todayStr);
+
+  tbody.innerHTML = buildAttendanceRowsHtml(
+    todayLogs,
+    "No attendance punches logged today.",
+    "Realtime check-ins from connected kiosks and web terminals will appear here."
+  );
+  safeCreateIcons();
+}
+
+// Render Live Feed Attendance Stream (Filtered by Selected Date & Query)
+function renderLiveFeedAttendance(logsToRender) {
+  const tbodyFull = document.getElementById('attendance-table-body-full');
+  if (!tbodyFull) return;
+
+  const datePicker = document.getElementById('live-feed-date-picker');
+  const selectedDate = datePicker ? datePicker.value.trim() : '';
+
+  let subtitle = "Punches will appear here live as employees check in.";
+  if (selectedDate) {
+    try {
+      subtitle = `Showing records for ${new Date(selectedDate + 'T00:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}.`;
+    } catch (_) {}
+  }
+
+  tbodyFull.innerHTML = buildAttendanceRowsHtml(
+    logsToRender,
+    "No attendance records match the selected filter.",
+    subtitle
+  );
+  safeCreateIcons();
+}
+
+// Master Render Attendance function called on data updates
+function renderAttendanceLogs(logs) {
+  renderDashboardAttendance();
+  filterAttendanceLogs();
+}
 
   safeCreateIcons();
 }
@@ -2031,6 +2079,7 @@ function renderEmployees(employees) {
         </div>
         <h4 class="font-bold text-slate-900 dark:text-white text-base">${escapeHtml(emp.name)}</h4>
         <span class="text-xs text-cyan-600 dark:text-cyan-400/80 font-mono mt-0.5">${escapeHtml(emp.employee_code || 'EMP-' + emp.id.slice(0, 4))}</span>
+        ${emp.phone ? `<span class="text-xs text-slate-500 dark:text-gray-400 flex items-center justify-center gap-1 mt-1"><i data-lucide="phone" class="w-3 h-3 text-[#167BB0]"></i>${escapeHtml(emp.phone)}</span>` : ''}
         <span class="mt-2 px-2.5 py-0.5 rounded-full text-[11px] bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/60">${escapeHtml(emp.department || 'General')}</span>
         <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800/80 w-full flex items-center justify-between text-[11px] text-slate-500 dark:text-gray-500">
           <span>Biometric: ${emp.embeddings ? 'Enrolled' : 'Active'}</span>
@@ -2464,13 +2513,80 @@ function captureEnrollPhoto() {
   stopEnrollCamera();
 }
 
-// Filter Attendance Logs
+// Set Live Feed Date Mode ('today' or 'all')
+function setLiveFeedDate(mode) {
+  const picker = document.getElementById('live-feed-date-picker');
+  const todayBtn = document.getElementById('live-feed-btn-today');
+  const allBtn = document.getElementById('live-feed-btn-all');
+
+  if (mode === 'today') {
+    if (picker) picker.value = formatLocalYMD(new Date());
+    if (todayBtn) {
+      todayBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0] text-white transition-all";
+    }
+    if (allBtn) {
+      allBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all";
+    }
+  } else if (mode === 'all') {
+    if (picker) picker.value = '';
+    if (todayBtn) {
+      todayBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0]/10 text-[#167BB0] hover:bg-[#167BB0]/20 border border-[#167BB0]/30 transition-all";
+    }
+    if (allBtn) {
+      allBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0] text-white transition-all";
+    }
+  }
+
+  filterAttendanceLogs();
+}
+
+// Filter Attendance Logs in Live Feed Tab by Date and Search Query
 function filterAttendanceLogs() {
-  const query = (document.getElementById('search-attendance').value || '').toLowerCase();
-  const filtered = attendanceLogs.filter(log => {
-    return (log.employee_name || '').toLowerCase().includes(query);
+  const datePicker = document.getElementById('live-feed-date-picker');
+  const searchInput = document.getElementById('search-attendance');
+
+  const selectedDate = datePicker ? datePicker.value.trim() : '';
+  const query = searchInput ? (searchInput.value || '').trim().toLowerCase() : '';
+
+  // Synchronize button styles with current date picker value
+  const todayBtn = document.getElementById('live-feed-btn-today');
+  const allBtn = document.getElementById('live-feed-btn-all');
+  const todayStr = formatLocalYMD(new Date());
+
+  if (todayBtn && allBtn) {
+    if (selectedDate === todayStr) {
+      todayBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0] text-white transition-all";
+      allBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all";
+    } else if (!selectedDate) {
+      todayBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0]/10 text-[#167BB0] hover:bg-[#167BB0]/20 border border-[#167BB0]/30 transition-all";
+      allBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0] text-white transition-all";
+    } else {
+      todayBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0]/10 text-[#167BB0] hover:bg-[#167BB0]/20 border border-[#167BB0]/30 transition-all";
+      allBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all";
+    }
+  }
+
+  const filtered = (attendanceLogs || []).filter(log => {
+    // Filter by date if date is selected
+    if (selectedDate) {
+      const logDate = formatLocalYMD(new Date(log.created_at));
+      if (logDate !== selectedDate) return false;
+    }
+
+    // Filter by search query
+    if (query) {
+      const name = (log.employee_name || '').toLowerCase();
+      const empId = (log.employee_id || '').toLowerCase();
+      const dev = (log.device_id || '').toLowerCase();
+      if (!name.includes(query) && !empId.includes(query) && !dev.includes(query)) {
+        return false;
+      }
+    }
+
+    return true;
   });
-  renderAttendanceLogs(filtered);
+
+  renderLiveFeedAttendance(filtered);
 }
 
 // Filter Employees
@@ -2479,20 +2595,47 @@ function filterEmployees() {
   const filtered = employeesList.filter(emp => 
     (emp.name || '').toLowerCase().includes(query) || 
     (emp.employee_code || '').toLowerCase().includes(query) ||
-    (emp.department || '').toLowerCase().includes(query)
+    (emp.department || '').toLowerCase().includes(query) ||
+    (emp.phone || '').toLowerCase().includes(query)
   );
   renderEmployees(filtered);
 }
 
 // Export Attendance Logs to CSV
 function exportToCSV() {
-  if (!attendanceLogs.length) {
-    alert('No attendance data available to export.');
+  let logsToExport = attendanceLogs || [];
+  let fileSuffix = 'all';
+
+  if (activeNavTab === 'dashboard') {
+    const todayStr = new Date().toDateString();
+    logsToExport = logsToExport.filter(log => new Date(log.created_at).toDateString() === todayStr);
+    fileSuffix = `today_${formatLocalYMD(new Date())}`;
+  } else if (activeNavTab === 'live') {
+    const datePicker = document.getElementById('live-feed-date-picker');
+    const selectedDate = datePicker ? datePicker.value.trim() : '';
+    const searchInput = document.getElementById('search-attendance');
+    const query = searchInput ? (searchInput.value || '').trim().toLowerCase() : '';
+
+    logsToExport = logsToExport.filter(log => {
+      if (selectedDate && formatLocalYMD(new Date(log.created_at)) !== selectedDate) return false;
+      if (query) {
+        const name = (log.employee_name || '').toLowerCase();
+        const empId = (log.employee_id || '').toLowerCase();
+        const dev = (log.device_id || '').toLowerCase();
+        if (!name.includes(query) && !empId.includes(query) && !dev.includes(query)) return false;
+      }
+      return true;
+    });
+    fileSuffix = selectedDate ? `date_${selectedDate}` : `archive_${formatLocalYMD(new Date())}`;
+  }
+
+  if (!logsToExport.length) {
+    alert('No attendance data available to export for the current selection.');
     return;
   }
 
   const headers = ['ID', 'Employee Name', 'Punch Status', 'Confidence', 'Punctuality', 'Device', 'Timestamp'];
-  const rows = attendanceLogs.map(l => {
+  const rows = logsToExport.map(l => {
     const d = new Date(l.created_at);
     return [
       l.id || '',
@@ -2509,7 +2652,7 @@ function exportToCSV() {
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement('a');
   link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `attendance_punches_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute('download', `attendance_punches_${fileSuffix}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -2719,6 +2862,15 @@ function handleSaveConfig(e) {
 function openAddEmployeeModal() {
   capturedEnrollPhoto = null;
   capturedEnrollEmbedding = null;
+  const nameInput = document.getElementById('new-emp-name');
+  if (nameInput) nameInput.value = '';
+  const phoneInput = document.getElementById('new-emp-phone');
+  if (phoneInput) phoneInput.value = '';
+  const codeInput = document.getElementById('new-emp-code');
+  if (codeInput) codeInput.value = '';
+  const deptInput = document.getElementById('new-emp-dept');
+  if (deptInput) deptInput.value = '';
+
   const avatarPreview = document.getElementById('enroll-avatar-preview');
   const statusText = document.getElementById('enroll-status-text');
   if (avatarPreview) avatarPreview.innerHTML = '<i data-lucide="user" class="w-6 h-6"></i>';
@@ -2738,6 +2890,7 @@ function closeAddEmployeeModal() {
 async function handleCreateEmployee(e) {
   e.preventDefault();
   const name = document.getElementById('new-emp-name').value.trim();
+  const phone = (document.getElementById('new-emp-phone')?.value || '').trim();
   const code = document.getElementById('new-emp-code').value.trim();
   const dept = document.getElementById('new-emp-dept').value.trim();
 
@@ -2755,6 +2908,9 @@ async function handleCreateEmployee(e) {
       embeddings: capturedEnrollEmbedding || null,
       is_active: true,
     };
+    if (phone) {
+      newRecord.phone = phone;
+    }
     if (currentAuthUser && currentAuthUser.id) {
       newRecord.user_id = currentAuthUser.id;
     }
@@ -2765,22 +2921,21 @@ async function handleCreateEmployee(e) {
       .select();
 
     if (error) {
-      // Fallback: If user_id column does not exist in schema, retry without user_id
-      if (newRecord.user_id) {
-        delete newRecord.user_id;
-        const fallbackRes = await supabaseClient
-          .from('employees')
-          .insert([newRecord])
-          .select();
-        if (fallbackRes.error) throw fallbackRes.error;
-        data = fallbackRes.data;
-      } else {
-        throw error;
-      }
+      // Fallback: If phone or user_id column does not exist in schema, retry without them
+      if (newRecord.phone) delete newRecord.phone;
+      if (newRecord.user_id) delete newRecord.user_id;
+      const fallbackRes = await supabaseClient
+        .from('employees')
+        .insert([newRecord])
+        .select();
+      if (fallbackRes.error) throw fallbackRes.error;
+      data = fallbackRes.data;
     }
 
     closeAddEmployeeModal();
     document.getElementById('new-emp-name').value = '';
+    const phoneInput = document.getElementById('new-emp-phone');
+    if (phoneInput) phoneInput.value = '';
     document.getElementById('new-emp-code').value = '';
     document.getElementById('new-emp-dept').value = '';
     

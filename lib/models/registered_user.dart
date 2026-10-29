@@ -3,6 +3,7 @@ import 'dart:convert';
 class RegisteredUser {
   final String id;
   final String name;
+  final String? phone;
   final String photoPath;
   final DateTime registeredAt;
   final List<List<double>> embeddings;
@@ -10,6 +11,7 @@ class RegisteredUser {
   RegisteredUser({
     required this.id,
     required this.name,
+    this.phone,
     required this.photoPath,
     required this.registeredAt,
     required this.embeddings,
@@ -19,6 +21,7 @@ class RegisteredUser {
     return {
       'id': id,
       'name': name,
+      if (phone != null && phone!.isNotEmpty) 'phone': phone,
       'photoPath': photoPath,
       'registeredAt': registeredAt.toIso8601String(),
       'embeddings': embeddings,
@@ -47,7 +50,8 @@ class RegisteredUser {
     return RegisteredUser(
       id: map['id'] as String,
       name: map['name'] as String,
-      photoPath: map['photoPath'] as String,
+      phone: map['phone'] as String?,
+      photoPath: map['photoPath'] as String? ?? '',
       registeredAt: DateTime.parse(map['registeredAt'] as String),
       embeddings: parsedEmbeddings,
     );

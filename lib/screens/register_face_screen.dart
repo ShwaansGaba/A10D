@@ -201,6 +201,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
 
   Future<void> _promptForEmployeeName() async {
     final nameController = TextEditingController();
+    final phoneController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     final confirmed = await showModalBottomSheet<bool>(
@@ -300,6 +301,33 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
                     return null;
                   },
                 ),
+                const SizedBox(height: 14),
+
+                const Text(
+                  'Phone Number',
+                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText: 'e.g. +91 98765 43210',
+                    hintStyle: const TextStyle(color: Colors.white30),
+                    filled: true,
+                    fillColor: Colors.black26,
+                    prefixIcon: const Icon(Icons.phone_outlined, color: Colors.cyanAccent),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Colors.white24),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Colors.cyanAccent, width: 1.5),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
 
                 SizedBox(
@@ -329,6 +357,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
     if (confirmed == true && nameController.text.trim().isNotEmpty) {
       final RegisteredUser user = await FaceRecognitionService().registerUserMultiView(
         name: nameController.text.trim(),
+        phone: phoneController.text.trim().isNotEmpty ? phoneController.text.trim() : null,
         mainPhotoPath: _mainPhotoPath ?? '',
         embeddings: _capturedEmbeddings,
         croppedPhotoPath: _mainCroppedPath,

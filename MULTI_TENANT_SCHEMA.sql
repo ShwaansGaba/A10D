@@ -4,9 +4,12 @@
 -- (Supabase Dashboard -> Project -> SQL Editor -> New Query -> Run)
 -- ==============================================================
 
--- 1. Add user_id (Tenant ID) to employees table
+-- 1. Add user_id (Tenant ID) and phone to employees table
 ALTER TABLE public.employees 
 ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE public.employees 
+ADD COLUMN IF NOT EXISTS phone TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_employees_user_id ON public.employees(user_id);
 

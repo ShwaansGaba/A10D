@@ -398,21 +398,23 @@ class SupabaseSyncService {
         if (currentUserId != null) {
           final res = await Supabase.instance.client
               .from('employees')
-              .select('id, name, embeddings, photo_url, created_at')
+              .select('id, name, phone, embeddings, photo_url, created_at')
               .eq('user_id', currentUserId!);
           employeeList = List<Map<String, dynamic>>.from(res);
         } else {
           final res = await Supabase.instance.client
               .from('employees')
-              .select('id, name, embeddings, photo_url, created_at');
+              .select('id, name, phone, embeddings, photo_url, created_at');
           employeeList = List<Map<String, dynamic>>.from(res);
         }
       } catch (_) {
-        // Fallback if user_id column does not exist in schema
-        final res = await Supabase.instance.client
-            .from('employees')
-            .select('id, name, embeddings, photo_url, created_at');
-        employeeList = List<Map<String, dynamic>>.from(res);
+        // Fallback if user_id or phone column does not exist in schema
+        try {
+          final res = await Supabase.instance.client
+              .from('employees')
+              .select('id, name, embeddings, photo_url, created_at');
+          employeeList = List<Map<String, dynamic>>.from(res);
+        } catch (_) {}
       }
 
       _employeeUuidCache.clear();
@@ -484,6 +486,9 @@ class SupabaseSyncService {
         'embeddings': user.embeddings,
         'created_at': user.registeredAt.toUtc().toIso8601String(),
       };
+      if (user.phone != null && user.phone!.trim().isNotEmpty) {
+        payload['phone'] = user.phone!.trim();
+      }
       if (currentUserId != null) {
         payload['user_id'] = currentUserId;
       }
@@ -519,9 +524,14 @@ class SupabaseSyncService {
               .maybeSingle();
         }
       } catch (e) {
-        // Fallback: If user_id column is not in schema, try without user_id
+        // Fallback: If user_id or phone column is not in schema, try stripping them
+        if (payload.containsKey('phone')) {
+          payload.remove('phone');
+        }
         if (payload.containsKey('user_id')) {
           payload.remove('user_id');
+        }
+        try {
           if (existing != null && existing['id'] != null) {
             final existingId = existing['id'] as String;
             res = await Supabase.instance.client
@@ -539,6 +549,8 @@ class SupabaseSyncService {
                 .select('id')
                 .maybeSingle();
           }
+        } catch (innerErr) {
+          debugPrint('Sync employee fallback error: $innerErr');
         }
       }
 

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DigiLocker Aadhaar Verification Gateway</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- Background Glow & Grid -->
+  <div class="fixed inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(59,130,246,0.15),rgba(255,255,255,0))] pointer-events-none -z-10"></div>
+  <div class="fixed inset-0 bg-grid-pattern opacity-10 pointer-events-none -z-10"></div>
+
+  <!-- Navbar -->
+  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 p-0.5 shadow-lg shadow-blue-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <i data-lucide="shield-check" class="w-5 h-5 text-blue-400"></i>
+          </div>
+        </div>
+        <div>
+          <div class="font-extrabold text-base tracking-tight flex items-center space-x-1.5">
+            <span>DigiLocker</span>
+            <span class="text-blue-400">e-KYC</span>
+          </div>
+          <p class="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Government Document Gateway</p>
+        </div>
+      </div>
+
+      <!-- Right controls -->
+      <div class="flex items-center space-x-3">
+        <div id="modeBadge" class="flex items-center space-x-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-full text-xs font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="modeText" class="text-slate-300">Test API</span>
+        </div>
+        <button id="openSettingsBtn" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition border border-transparent hover:border-slate-700">
+          <i data-lucide="settings" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-grow max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col justify-center">
+    
+    <!-- Hero / Title -->
+    <div class="text-center max-w-2xl mx-auto mb-10">
+      <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-3">
+        <i data-lucide="badge-check" class="w-3.5 h-3.5"></i>
+        <span>UIDAI Compliant Digital Verification</span>
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight sm:leading-tight">
+        Aadhaar Verification <br class="hidden sm:inline">with <span class="bg-gradient-to-r from-blue-400 via-indigo-400 to-sky-400 bg-clip-text text-transparent">DigiLocker API</span>
+      </h1>
+      <p class="mt-3 text-slate-400 text-sm sm:text-base leading-relaxed">
+        Secure, consent-driven identity verification via Sandbox.co.in. Retrieve officially signed demographic XML, profile photo, and address proofs in seconds.
+      </p>
+    </div>
+
+    <!-- Active Step Flow Card -->
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-xl p-6 sm:p-8">
+      
+      <!-- Progress Steps -->
+      <div class="grid grid-cols-3 gap-2 pb-8 border-b border-slate-800 text-center">
+        <div id="stepIndicator1" class="step-badge active flex flex-col items-center">
+          <div class="w-8 h-8 rounded-full border-2 border-blue-500 bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs mb-1.5 transition">1</div>
+          <span class="text-xs font-semibold text-slate-200">Initiate</span>
+        </div>
+        <div id="stepIndicator2" class="step-badge flex flex-col items-center">
+          <div class="w-8 h-8 rounded-full border-2 border-slate-700 bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-xs mb-1.5 transition">2</div>
+          <span class="text-xs font-semibold text-slate-400">DigiLocker Consent</span>
+        </div>
+        <div id="stepIndicator3" class="step-badge flex flex-col items-center">
+          <div class="w-8 h-8 rounded-full border-2 border-slate-700 bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-xs mb-1.5 transition">3</div>
+          <span class="text-xs font-semibold text-slate-400">Verified Identity</span>
+        </div>
+      </div>
+
+      <!-- VIEW 1: Ready to Initiate -->
+      <div id="viewInitiate" class="py-8 text-center space-y-6">
+        <div class="max-w-md mx-auto bg-slate-800/40 border border-slate-700/50 rounded-xl p-5 text-left space-y-3">
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Verification Scope</div>
+          <div class="flex items-center space-x-3 text-sm text-slate-300">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span>Official UIDAI Offline e-KYC (XML Data)</span>
+          </div>
+          <div class="flex items-center space-x-3 text-sm text-slate-300">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span>Full Name, Date of Birth & Gender</span>
+          </div>
+          <div class="flex items-center space-x-3 text-sm text-slate-300">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span>Complete Registered Address & Pincode</span>
+          </div>
+          <div class="flex items-center space-x-3 text-sm text-slate-300">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span>UIDAI Digital Photograph & Masked UID</span>
+          </div>
+        </div>
+
+        <!-- Mode selection radio -->
+        <div class="max-w-md mx-auto flex items-center justify-center space-x-4 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+          <label class="flex items-center space-x-2 text-xs font-medium cursor-pointer">
+            <input type="radio" name="flowMode" value="api" id="modeRadioApi" checked class="text-blue-600 focus:ring-0">
+            <span>Sandbox API Call</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs font-medium cursor-pointer">
+            <input type="radio" name="flowMode" value="sim" id="modeRadioSim" class="text-blue-600 focus:ring-0">
+            <span>Interactive Simulator</span>
+          </label>
+        </div>
+
+        <div>
+          <button id="startVerificationBtn" class="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-base rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 transition transform hover:-translate-y-0.5 inline-flex items-center space-x-2.5">
+            <i data-lucide="lock" class="w-4 h-4"></i>
+            <span>Verify with DigiLocker</span>
+          </button>
+        </div>
+
+        <!-- Diagnostic Alert if Sandbox returned 403 -->
+        <div id="diagnosticAlert" class="hidden max-w-lg mx-auto bg-amber-950/40 border border-amber-500/40 rounded-xl p-4 text-left">
+          <div class="flex items-start space-x-3">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5"></i>
+            <div class="text-xs space-y-1.5">
+              <div class="font-bold text-amber-300">Sandbox Notice: "Insufficient Privilege" (403)</div>
+              <p class="text-amber-200/80 leading-relaxed" id="diagnosticMessage">
+                Your Sandbox test workspace requires the KYC / DigiLocker product to be enabled under your account console.
+              </p>
+              <div class="pt-2 flex items-center space-x-3">
+                <button id="fallbackSimulatorBtn" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg shadow text-xs">
+                  Run in Interactive Simulator
+                </button>
+                <button id="openSettingsNoticeBtn" class="text-amber-400 hover:underline font-medium text-xs">
+                  Change API Keys →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Waiting for User Consent -->
+      <div id="viewWaiting" class="hidden py-10 text-center space-y-6">
+        <div class="relative w-20 h-20 mx-auto">
+          <div class="absolute inset-0 rounded-full border-4 border-slate-700/50"></div>
+          <div class="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <i data-lucide="external-link" class="w-7 h-7 text-blue-400"></i>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <h3 class="text-xl font-bold text-white">DigiLocker Consent Window Active</h3>
+          <p class="text-slate-400 text-sm max-w-md mx-auto">
+            Please complete sign-in and grant document consent in the DigiLocker window. We will automatically detect your approval.
+          </p>
+        </div>
+
+        <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a id="reopenAuthLink" href="#" target="_blank" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-2">
+            <span>Re-open DigiLocker Tab</span>
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          </a>
+          <button id="checkStatusManualBtn" class="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold">
+            Check Status Now
+          </button>
+          <button id="cancelSessionBtn" class="w-full sm:w-auto px-4 py-2.5 text-slate-400 hover:text-red-400 text-xs font-medium">
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- VIEW 3: Verified Aadhaar Card Display -->
+      <div id="viewResult" class="hidden py-4 space-y-8">
+        
+        <!-- Success Banner -->
+        <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="font-bold text-emerald-400 text-sm">Identity Successfully Verified</div>
+              <div class="text-xs text-slate-400">Authenticated via DigiLocker UIDAI e-KYC repository</div>
+            </div>
+          </div>
+          <span class="text-xs font-mono bg-emerald-950 text-emerald-300 border border-emerald-800 px-2.5 py-1 rounded">
+            KYC VERIFIED
+          </span>
+        </div>
+
+        <!-- Authentic Digital Aadhaar Card Component -->
+        <div class="max-w-2xl mx-auto aadhaar-card rounded-2xl shadow-2xl border border-slate-300 overflow-hidden text-slate-900 bg-white">
+          <!-- Card Header -->
+          <div class="px-6 py-3 bg-gradient-to-r from-orange-600 via-white to-green-700 flex items-center justify-between border-b border-slate-200">
+            <div class="flex items-center space-x-3">
+              <!-- Ashoka Emblem SVG or Icon -->
+              <div class="w-8 h-8 flex items-center justify-center font-serif font-black text-amber-900 text-lg">
+                🏛️
+              </div>
+              <div>
+                <div class="text-[11px] font-bold tracking-tight text-slate-900 leading-none">भारत सरकार &bull; Government of India</div>
+                <div class="text-[10px] text-slate-700 font-medium">Unique Identification Authority of India</div>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] font-bold bg-blue-100 text-blue-900 px-2 py-0.5 rounded border border-blue-300">
+                DigiLocker Verified
+              </span>
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="p-6 relative">
+            <!-- Aadhaar Emblem Watermark in background -->
+            <div class="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none font-bold text-9xl">
+              UIDAI
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6 relative z-10 items-center">
+              
+              <!-- Photo Column -->
+              <div class="md:col-span-4 flex flex-col items-center">
+                <div id="aadhaarPhotoContainer" class="w-32 h-36 rounded-lg border-2 border-slate-300 overflow-hidden bg-slate-100 shadow flex items-center justify-center">
+                  <img id="aadhaarPhoto" src="" alt="Aadhaar Photo" class="w-full h-full object-cover hidden">
+                  <div id="aadhaarAvatar" class="w-full h-full bg-gradient-to-br from-blue-700 to-indigo-900 text-white flex items-center justify-center text-4xl font-black">
+                    RS
+                  </div>
+                </div>
+                <div class="text-[10px] font-bold text-slate-500 mt-2 tracking-widest uppercase">OFFICIAL UIDAI PHOTO</div>
+              </div>
+
+              <!-- Information Column -->
+              <div class="md:col-span-8 space-y-3">
+                <div>
+                  <div class="text-xs text-slate-500 font-semibold uppercase">Name</div>
+                  <div id="aadhaarName" class="text-xl font-extrabold text-slate-900">Rahul Sharma</div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-xs text-slate-500 font-semibold uppercase">Date of Birth</div>
+                    <div id="aadhaarDob" class="text-sm font-bold text-slate-800">14/08/1994</div>
+                  </div>
+                  <div>
+                    <div class="text-xs text-slate-500 font-semibold uppercase">Gender</div>
+                    <div id="aadhaarGender" class="text-sm font-bold text-slate-800">MALE / पुरुष</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-xs text-slate-500 font-semibold uppercase">Care Of / Guardian</div>
+                  <div id="aadhaarCareOf" class="text-xs font-semibold text-slate-800">S/O: Devendra Sharma</div>
+                </div>
+
+                <div>
+                  <div class="text-xs text-slate-500 font-semibold uppercase">Registered Address</div>
+                  <div id="aadhaarAddress" class="text-xs text-slate-700 leading-relaxed font-medium">
+                    B-44, Sector 62, Noida, Gautam Buddha Nagar, Uttar Pradesh, PIN: 201301
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Aadhaar Number Footer Banner -->
+            <div class="mt-6 pt-4 border-t-2 border-red-600/70 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div class="text-center sm:text-left">
+                <div class="text-[11px] font-semibold text-slate-500">आधार क्रमांक / Aadhaar Number:</div>
+                <div id="aadhaarNumber" class="text-2xl font-mono font-black tracking-widest text-blue-900">
+                  XXXX XXXX 6712
+                </div>
+              </div>
+              <div class="flex items-center space-x-2 text-slate-600 text-xs">
+                <!-- QR Placeholder -->
+                <div class="w-12 h-12 bg-slate-900 rounded p-1 flex items-center justify-center text-white">
+                  <i data-lucide="qr-code" class="w-10 h-10"></i>
+                </div>
+                <div class="text-[10px] leading-tight">
+                  <span class="font-bold">मेरा आधार, मेरी पहचान</span><br>
+                  UIDAI Cryptographic Seal
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card Bottom Note -->
+          <div class="bg-slate-100 px-6 py-2 text-center text-[10px] text-slate-500 border-t border-slate-200">
+            Digitally validated by Sandbox.co.in DigiLocker API &bull; Legal under Information Technology Act 2000
+          </div>
+        </div>
+
+        <!-- Verification Metadata & Developer Inspector -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 text-xs">
+            <div class="font-bold text-slate-300 text-sm flex items-center space-x-2">
+              <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
+              <span>Audit Trail</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-800 text-slate-400">
+              <span>Session ID:</span>
+              <span id="metaSessionId" class="font-mono text-slate-200">--</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-800 text-slate-400">
+              <span>Execution Mode:</span>
+              <span id="metaMode" class="font-semibold text-blue-400">--</span>
+            </div>
+            <div class="flex justify-between py-1 text-slate-400">
+              <span>Verified Timestamp:</span>
+              <span id="metaTime" class="text-slate-200">--</span>
+            </div>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <div class="font-bold text-slate-300 text-sm">Download & Export</div>
+              <p class="text-xs text-slate-400 mt-1">Export official verification JSON payload for KYC archives.</p>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button id="downloadJsonBtn" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 flex items-center justify-center space-x-1.5">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Download JSON</span>
+              </button>
+              <button id="verifyAnotherBtn" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Verify Another</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Settings Drawer / Modal -->
+  <div id="settingsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="sliders" class="w-5 h-5 text-blue-400"></i>
+          <h3 class="font-bold text-white text-base">API Configuration</h3>
+        </div>
+        <button id="closeSettingsBtn" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Target Environment</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="setEnvTest" class="py-2 px-3 rounded-lg border font-semibold text-xs transition bg-blue-600 text-white border-blue-500">
+              Test (test-api.sandbox.co.in)
+            </button>
+            <button type="button" id="setEnvProd" class="py-2 px-3 rounded-lg border font-semibold text-xs transition bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200">
+              Production (api.sandbox.co.in)
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">API Key (`x-api-key`)</label>
+          <input type="text" id="cfgApiKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">API Secret (`x-api-secret`)</label>
+          <input type="password" id="cfgApiSecret" placeholder="••••••••••••••••••••••••" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Callback / Redirect URL</label>
+          <input type="text" id="cfgRedirectUrl" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none">
+          <p class="text-[10px] text-slate-500 mt-1">DigiLocker requires HTTPS redirect URLs for production. For local dev, ngrok or the simulator is used.</p>
+        </div>
+
+        <div class="pt-2 border-t border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <input type="checkbox" id="cfgUseSim" class="rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-0">
+            <label for="cfgUseSim" class="text-xs text-slate-300 font-medium cursor-pointer">Default to Simulator</label>
+          </div>
+          <button id="saveConfigBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold text-xs">
+            Save Configuration
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
+    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div>DigiLocker KYC Gateway &bull; Sandbox API Integration</div>
+      <div class="flex items-center space-x-4">
+        <span>Powered by Sandbox.co.in</span>
+        <span>•</span>
+        <span>UIDAI Compliant</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

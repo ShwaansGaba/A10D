@@ -106,6 +106,7 @@ class FaceRecognitionService {
   /// Register an employee with multi-view biometric embeddings
   Future<RegisteredUser> registerUserMultiView({
     required String name,
+    String? phone,
     required String mainPhotoPath,
     required List<List<double>> embeddings,
     String? croppedPhotoPath,
@@ -125,6 +126,7 @@ class FaceRecognitionService {
     final newUser = RegisteredUser(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name.trim(),
+      phone: phone?.trim(),
       photoPath: destinationPath,
       registeredAt: DateTime.now(),
       embeddings: embeddings,
@@ -293,6 +295,7 @@ class FaceRecognitionService {
           final newUser = RegisteredUser(
             id: empId,
             name: name.trim(),
+            phone: emp['phone'] as String?,
             photoPath: localPhotoPath,
             registeredAt: emp['created_at'] != null ? DateTime.tryParse(emp['created_at']) ?? DateTime.now() : DateTime.now(),
             embeddings: parsedEmbeddings,

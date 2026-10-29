@@ -1,0 +1,34 @@
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.bg-grid-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.aadhaar-card {
+  position: relative;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.aadhaar-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.3);
+}
+
+/* Stepper styles */
+.step-badge.active div {
+  border-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+}
+
+.step-badge.completed div {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
