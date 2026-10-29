@@ -111,7 +111,7 @@ window.handleGlobalSearch = handleGlobalSearch;
 // Theme Toggle (Light / Dark Theme)
 // ==============================================================
 function initTheme() {
-  const savedTheme = localStorage.getItem('portal_theme') || 'dark';
+  const savedTheme = localStorage.getItem('portal_theme') || 'light';
   applyTheme(savedTheme);
 }
 
@@ -208,6 +208,8 @@ function showAuthOverlay() {
     auth.classList.remove('hidden');
     switchAuthMode('login');
   }
+  // Enforce dark theme exclusively on login page
+  document.documentElement.classList.add('dark');
   document.body.className = 'bg-[#1F62D1] min-h-screen font-sans antialiased transition-colors duration-200 flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8';
 }
 
@@ -216,6 +218,11 @@ function hideAuthOverlay() {
   const main = document.getElementById('main-app-container');
   if (auth) auth.classList.add('hidden');
   if (main) main.classList.remove('hidden');
+  
+  // Restore portal theme for dashboard (defaulting to light theme)
+  const savedTheme = localStorage.getItem('portal_theme') || 'light';
+  applyTheme(savedTheme);
+
   document.body.className = 'bg-[#E5E9F2] dark:bg-[#0B0F17] text-slate-800 dark:text-gray-100 min-h-screen font-sans antialiased transition-colors duration-200 p-2 sm:p-4 md:p-6 lg:p-8 flex items-center justify-center';
 }
 
@@ -1693,8 +1700,8 @@ function initSupabase() {
 
   if (!url || !key) {
     if (badge) {
-      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/30 flex items-center space-x-2 hover:bg-red-500/20 transition-all cursor-pointer';
-      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span><span>Configure Supabase</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center space-x-1.5 hover:bg-red-500/20 transition-all cursor-pointer';
+      badge.innerHTML = '<i data-lucide="cloud-off" class="w-3.5 h-3.5 mr-1 text-red-500"></i><span>Configure Supabase</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
     }
     safeCreateIcons();
     renderSampleDemoData();
@@ -1705,8 +1712,8 @@ function initSupabase() {
     supabaseClient = window.supabase.createClient(url, key);
 
     if (badge) {
-      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 flex items-center space-x-2 hover:bg-green-500/20 transition-all cursor-pointer';
-      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span><span>Connected</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center space-x-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer';
+      badge.innerHTML = '<i data-lucide="cloud" class="w-3.5 h-3.5 mr-1 text-slate-500"></i><span>Connected</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
     }
     safeCreateIcons();
 
@@ -1715,8 +1722,8 @@ function initSupabase() {
   } catch (err) {
     console.error('Failed to init Supabase:', err);
     if (badge) {
-      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30 flex items-center space-x-2 hover:bg-amber-500/20 transition-all cursor-pointer';
-      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span>Connection Error</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
+      badge.className = 'px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center space-x-1.5 hover:bg-amber-500/20 transition-all cursor-pointer';
+      badge.innerHTML = '<i data-lucide="alert-circle" class="w-3.5 h-3.5 mr-1 text-amber-500"></i><span>Connection Error</span><i data-lucide="settings" class="w-3.5 h-3.5 ml-1"></i>';
     }
     safeCreateIcons();
   }
@@ -1869,9 +1876,8 @@ function renderAttendanceLogs(logs) {
           </div>
         </td>
         <td class="py-3.5 px-4">
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30">
-            <span class="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 mr-1.5"></span>
-            PUNCHED IN
+          <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+            Checked In
           </span>
         </td>
         <td class="py-3.5 px-4">
@@ -1991,11 +1997,11 @@ function renderSummaryView() {
         </td>
         <td class="py-3.5 px-4">
           ${isPresent 
-            ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30">
-                <span class="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400 mr-1.5"></span>Present
+            ? `<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                Present
                </span>`
-            : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30">
-                <span class="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-red-400 mr-1.5"></span>Absent
+            : `<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
+                Absent
                </span>`
           }
         </td>
@@ -2109,7 +2115,7 @@ function showPunchToast(log) {
     <div>
       <div class="font-bold text-slate-900 dark:text-white text-sm">${escapeHtml(log.employee_name)}</div>
       <div class="text-xs text-green-600 dark:text-green-400 font-medium">
-        Punched In • Just now
+        Checked In • Just now
       </div>
     </div>
   `;
@@ -2512,7 +2518,7 @@ function exportToCSV() {
     return [
       l.id || '',
       `"${(l.employee_name || '').replace(/"/g, '""')}"`,
-      'PUNCH IN',
+      'Checked In',
       l.confidence || '1.0',
       isPunchLate(d) ? 'Late' : 'On Time',
       l.device_id || 'Kiosk',
