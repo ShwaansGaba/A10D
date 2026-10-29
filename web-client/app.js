@@ -44,6 +44,11 @@ let capturedEnrollEmbedding = null;
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
 
+  // Purge any legacy deleted accounts blacklist from localStorage
+  try {
+    localStorage.removeItem('a10d_deleted_accounts');
+  } catch (_) {}
+
   // Set default summary date picker to today
   const summaryPicker = document.getElementById('summary-date-picker');
   if (summaryPicker) {
@@ -149,12 +154,6 @@ async function initAuth() {
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session && session.user) {
-      if (session.user.user_metadata && session.user.user_metadata.account_deleted === true) {
-        await supabaseClient.auth.signOut();
-        showAuthOverlay();
-        return;
-      }
-
       if (signupInProgress) {
         // User was setting up their password in Step 3! Do not auto-login to dashboard!
         isSignupInProgress = true;
@@ -178,12 +177,6 @@ async function initAuth() {
   supabaseClient.auth.onAuthStateChange((event, session) => {
     console.log('Supabase Auth State Event:', event);
     if (session && session.user) {
-      if (session.user.user_metadata && session.user.user_metadata.account_deleted === true) {
-        supabaseClient.auth.signOut();
-        showAuthOverlay();
-        return;
-      }
-
       // CRITICAL: If user is actively signing up, DO NOT bypass Step 3 (password setup)!
       if (authMode === 'signup' || isSignupInProgress) {
         console.log('Holding auto-login: user must set account password in Step 3.');
@@ -449,13 +442,9 @@ async function handleLoginSubmit(e) {
   const btn = document.getElementById('login-btn') || document.getElementById('login-submit-btn');
   const originalHtml = btn ? btn.innerHTML : '<span>Sign In</span>';
 
-  // Check if account was previously marked deleted
+  // Ensure any stale local blacklist is wiped
   try {
-    const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
-    if (deletedList.includes(email)) {
-      showAuthAlert('This account was deleted. To re-use this email, click "Create an Account" to register fresh.', 'error');
-      return;
-    }
+    localStorage.removeItem('a10d_deleted_accounts');
   } catch (_) {}
 
   if (btn) {
@@ -472,9 +461,13 @@ async function handleLoginSubmit(e) {
 
     if (error) throw error;
     if (data && data.user) {
+      // Clear account_deleted flag if leftover in metadata
       if (data.user.user_metadata && data.user.user_metadata.account_deleted === true) {
-        await supabaseClient.auth.signOut();
-        throw new Error('This account has been permanently deleted. Please create a new account.');
+        try {
+          await supabaseClient.auth.updateUser({
+            data: { account_deleted: false, restored_at: new Date().toISOString() }
+          });
+        } catch (_) {}
       }
       handleAuthSuccess(data.user);
     }
@@ -516,31 +509,25 @@ async function handleSignupStep1Submit(e) {
   safeCreateIcons();
 
   try {
-    // 1. Check if this email was previously deleted or is an existing active account
-    const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
-    const isPreviouslyDeleted = deletedList.some(e => e.toLowerCase() === pendingSignupEmail.toLowerCase());
-
-    if (!isPreviouslyDeleted) {
-      const { data: checkData, error: checkError } = await supabaseClient.auth.signInWithOtp({
-        email: pendingSignupEmail,
-        options: {
-          shouldCreateUser: false,
-        }
-      });
-
-      if (!checkError) {
-        // Email is ALREADY registered and active in Supabase!
-        const loginEmailInput = document.getElementById('login-email');
-        if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
-
-        switchAuthMode('login');
-        showAuthAlert('This email is already registered. Please sign in with your password.', 'error');
-        return;
+    // 1. Check if email is already active in Supabase
+    const { data: checkData, error: checkError } = await supabaseClient.auth.signInWithOtp({
+      email: pendingSignupEmail,
+      options: {
+        shouldCreateUser: false,
       }
+    });
+
+    if (!checkError) {
+      // Email is ALREADY registered and active in Supabase!
+      const loginEmailInput = document.getElementById('login-email');
+      if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
+
+      switchAuthMode('login');
+      showAuthAlert('This email is already registered. Please sign in with your password.', 'error');
+      return;
     }
 
-    // 2. Either email is NOT registered, OR it was a deleted account ready for fresh signup.
-    // Proceed to dispatch OTP code with shouldCreateUser: true
+    // 2. Email is not active or ready for fresh registration. Dispatch OTP code with shouldCreateUser: true
     if (btn) {
       btn.innerHTML = '<span>Sending Code...</span>';
     }
@@ -683,11 +670,8 @@ async function handleSignupStep3Submit(e) {
 
     if (error) throw error;
 
-    // 2. Remove email from local deleted accounts blacklist so it is completely fresh
     try {
-      const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
-      const filtered = deletedList.filter(e => e.toLowerCase() !== pendingSignupEmail.toLowerCase());
-      localStorage.setItem('a10d_deleted_accounts', JSON.stringify(filtered));
+      localStorage.removeItem('a10d_deleted_accounts');
     } catch (_) {}
 
     // 3. Clear signup flags
@@ -1612,13 +1596,8 @@ async function executeAccountDeletion() {
       }
     }
 
-    // 6. Record in local deleted accounts list so signup knows this email can be re-registered
     try {
-      const deletedList = JSON.parse(localStorage.getItem('a10d_deleted_accounts') || '[]');
-      if (userEmail && !deletedList.includes(userEmail)) {
-        deletedList.push(userEmail);
-        localStorage.setItem('a10d_deleted_accounts', JSON.stringify(deletedList));
-      }
+      localStorage.removeItem('a10d_deleted_accounts');
     } catch (_) {}
 
     // 7. Sign out permanently

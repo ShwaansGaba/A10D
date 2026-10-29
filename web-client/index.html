@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>A10D | Attendance Management System</title>
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="shortcut icon" href="favicon.ico">
@@ -1243,8 +1246,12 @@ ALTER TABLE public.kiosks DISABLE ROW LEVEL SECURITY;</pre>
     </div>
   </div>
 
+  <!-- Purge legacy local storage keys -->
+  <script>
+    try { localStorage.removeItem('a10d_deleted_accounts'); } catch (_) {}
+  </script>
   <!-- Load Config and App Scripts -->
-  <script src="supabase-config.js"></script>
-  <script src="app.js"></script>
+  <script src="supabase-config.js?v=2.1"></script>
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>
