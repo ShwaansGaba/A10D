@@ -324,16 +324,15 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
             Container(
               width: 38,
               height: 38,
-              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(12),
+                shape: BoxShape.circle,
+                color: const Color(0xFF1394CE),
+                border: Border.all(color: const Color(0xFF1394CE), width: 1.5),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+              child: ClipOval(
                 child: Image.asset(
                   'assets/images/logo.png',
-                  fit: BoxFit.contain,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),

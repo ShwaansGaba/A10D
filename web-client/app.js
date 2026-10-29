@@ -210,7 +210,7 @@ function showAuthOverlay() {
   }
   // Enforce dark theme exclusively on login page
   document.documentElement.classList.add('dark');
-  document.body.className = 'bg-[#1F62D1] min-h-screen font-sans antialiased transition-colors duration-200 flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8';
+  document.body.className = 'bg-[#1D93CA] min-h-screen font-sans antialiased transition-colors duration-200 flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8';
 }
 
 function hideAuthOverlay() {

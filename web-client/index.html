@@ -51,20 +51,20 @@
     }
     /* Photorealistic 3D Spheres matching reference login design */
     .sphere-3d-main {
-      background: radial-gradient(circle at 35% 30%, #68aeff 0%, #2974f0 32%, #1952be 65%, #0d2f78 100%);
-      box-shadow: 0 20px 45px rgba(10, 35, 90, 0.42), inset -8px -8px 20px rgba(5, 18, 50, 0.5), inset 6px 6px 14px rgba(255, 255, 255, 0.45);
+      background: radial-gradient(circle at 35% 30%, #58c2f5 0%, #1D93CA 35%, #136da5 70%, #0a4670 100%);
+      box-shadow: 0 20px 45px rgba(10, 50, 90, 0.42), inset -8px -8px 20px rgba(5, 25, 50, 0.5), inset 6px 6px 14px rgba(255, 255, 255, 0.45);
     }
     .sphere-3d-left {
-      background: radial-gradient(circle at 35% 30%, #5ba4ff 0%, #1e62dc 35%, #1244a0 70%, #09245a 100%);
-      box-shadow: 0 15px 35px rgba(10, 35, 90, 0.38), inset -6px -6px 16px rgba(5, 18, 50, 0.45), inset 4px 4px 10px rgba(255, 255, 255, 0.35);
+      background: radial-gradient(circle at 35% 30%, #58c2f5 0%, #1D93CA 35%, #136da5 70%, #0a4670 100%);
+      box-shadow: 0 15px 35px rgba(10, 50, 90, 0.38), inset -6px -6px 16px rgba(5, 25, 50, 0.45), inset 4px 4px 10px rgba(255, 255, 255, 0.35);
     }
     .sphere-3d-corner {
-      background: radial-gradient(circle at 35% 30%, #68aeff 0%, #2974f0 35%, #1a56c4 70%, #0d327d 100%);
-      box-shadow: 0 15px 35px rgba(10, 35, 90, 0.25), inset -6px -6px 15px rgba(5, 18, 50, 0.35), inset 4px 4px 10px rgba(255, 255, 255, 0.35);
+      background: radial-gradient(circle at 35% 30%, #58c2f5 0%, #1D93CA 35%, #136da5 70%, #0a4670 100%);
+      box-shadow: 0 15px 35px rgba(10, 50, 90, 0.25), inset -6px -6px 15px rgba(5, 25, 50, 0.35), inset 4px 4px 10px rgba(255, 255, 255, 0.35);
     }
   </style>
 </head>
-<body class="bg-[#1F62D1] min-h-screen font-sans antialiased transition-colors duration-200 flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8">
+<body class="bg-[#1D93CA] min-h-screen font-sans antialiased transition-colors duration-200 flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8">
 
   <!-- ============================================================== -->
   <!-- 1. STANDALONE LOGIN & SIGN UP PAGE (HEAVILY INSPIRED BY REFERENCE) -->
@@ -73,11 +73,11 @@
     <div id="auth-card" class="bg-white dark:bg-[#151B28] rounded-[28px] sm:rounded-[36px] w-full max-w-[960px] shadow-[0_30px_90px_rgba(10,35,90,0.38)] relative overflow-hidden flex flex-col md:flex-row transition-all my-auto">
       
       <!-- Left Welcome Panel (Matching Reference Image) -->
-      <div class="w-full md:w-[48%] relative bg-gradient-to-br from-[#1E57C3] via-[#1A4EB5] to-[#123B91] p-8 sm:p-10 lg:p-12 flex flex-col justify-between overflow-hidden text-white min-h-[320px] md:min-h-[580px] shrink-0">
+      <div class="w-full md:w-[48%] relative bg-[#1D93CA] p-8 sm:p-10 lg:p-12 flex flex-col justify-between overflow-hidden text-white min-h-[320px] md:min-h-[580px] shrink-0">
         
         <!-- Curved backdrop overlay / light effects -->
-        <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-blue-400/20 blur-3xl pointer-events-none"></div>
-        <div class="absolute top-1/2 -right-20 w-80 h-80 rounded-full bg-[#1F62D1]/40 blur-2xl pointer-events-none"></div>
+        <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
+        <div class="absolute top-1/2 -right-20 w-80 h-80 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
 
         <!-- Layered 3D Spheres matching reference image -->
         <!-- Large sphere sitting in the center-bottom / transition zone -->
@@ -87,20 +87,15 @@
 
         <!-- Typography & Brand Info -->
         <div class="relative z-20">
-          <div class="flex items-center space-x-3 mb-6">
-            <img src="logo.png" alt="A10D Logo" class="w-12 h-12 rounded-2xl object-cover shadow-lg border border-white/20 shrink-0">
-            <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 shadow-sm">
-              <span class="text-[11px] font-bold tracking-wider uppercase text-blue-100">Attendance Portal</span>
-            </div>
+          <!-- A10D Brand Graphic Banner (Image 1 seamless fade) -->
+          <div class="mb-5">
+            <img src="brand_banner.png" alt="A10D" class="w-56 sm:w-64 max-w-full rounded-2xl object-contain drop-shadow-sm transition-transform duration-300 hover:scale-105" style="-webkit-mask-image: radial-gradient(ellipse 95% 85% at 50% 50%, black 70%, transparent 100%); mask-image: radial-gradient(ellipse 95% 85% at 50% 50%, black 70%, transparent 100%);">
           </div>
 
-          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase leading-none mb-2 text-white drop-shadow-sm">
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase leading-none mb-3 text-white drop-shadow-sm">
             WELCOME
           </h1>
-          <p class="text-xs sm:text-sm font-bold tracking-[0.22em] text-blue-200 uppercase mb-4">
-            A10D ATTENDANCE
-          </p>
-          <p class="text-xs sm:text-sm text-blue-100/85 leading-relaxed max-w-xs font-normal">
+          <p class="text-xs sm:text-sm text-blue-50/90 leading-relaxed max-w-xs font-normal">
             Welcome to A10D Attendance Management System. Track daily attendance, manage staff, and view real-time reports with ease.
           </p>
         </div>
@@ -360,7 +355,7 @@
       <!-- Top Brand Header: A10D -->
       <div class="mb-6">
         <div class="flex items-center space-x-3">
-          <img src="logo.png" alt="A10D Logo" class="w-11 h-11 rounded-2xl object-cover shadow-md border border-white/20 shrink-0">
+          <img src="logo.png" alt="A10D Logo" class="w-11 h-11 rounded-full object-cover shadow-md border border-white/20 shrink-0">
           <div>
             <h2 class="text-xl font-black text-white tracking-wider leading-none">A10D</h2>
             <p class="text-[11px] text-purple-200/80 font-medium mt-1">Attendance Management</p>

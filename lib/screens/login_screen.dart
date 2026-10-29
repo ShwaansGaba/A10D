@@ -154,30 +154,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // App Icon in Royal Blue Ring
+                  // App Icon in Brandmark Ring
                   Center(
                     child: Container(
-                      width: 80,
-                      height: 80,
+                      width: 84,
+                      height: 84,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF1E3A8A).withValues(alpha: 0.4),
-                        border: Border.all(color: royalBlue, width: 2),
+                        color: const Color(0xFF1394CE),
+                        border: Border.all(color: const Color(0xFF1394CE), width: 2.5),
                         boxShadow: [
                           BoxShadow(
-                            color: royalBlue.withValues(alpha: 0.35),
+                            color: const Color(0xFF1394CE).withValues(alpha: 0.4),
                             blurRadius: 24,
                             spreadRadius: 2,
                           ),
                         ],
                       ),
                       child: ClipOval(
-                        child: Padding(
-                          padding: const EdgeInsets.all(10.0),
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            fit: BoxFit.contain,
-                          ),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
