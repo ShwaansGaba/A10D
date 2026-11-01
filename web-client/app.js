@@ -1936,9 +1936,6 @@ function renderAttendanceLogs(logs) {
   filterAttendanceLogs();
 }
 
-  safeCreateIcons();
-}
-
 // Render Daily & Monthly Attendance Summary View
 function renderSummaryView() {
   const tbody = document.getElementById('summary-table-body');

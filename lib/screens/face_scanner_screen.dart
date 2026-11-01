@@ -95,7 +95,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     }
   }
 
-  Future<void> _initializeCamera() async {
+  Future<void> _initializeCamera({int? cameraIndex}) async {
     final status = await Permission.camera.request();
     if (!status.isGranted) {
       if (mounted) {
@@ -115,11 +115,18 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
     if (widget.cameras.isEmpty) return;
 
-    // Use front selfie camera
-    int targetIndex = widget.cameras.indexWhere(
-      (c) => c.lensDirection == CameraLensDirection.front,
-    );
-    if (targetIndex == -1) targetIndex = 0;
+    int targetIndex;
+    if (cameraIndex != null && cameraIndex >= 0 && cameraIndex < widget.cameras.length) {
+      targetIndex = cameraIndex;
+    } else if (_selectedCameraIndex >= 0 && _selectedCameraIndex < widget.cameras.length) {
+      targetIndex = _selectedCameraIndex;
+    } else {
+      // Default to front selfie camera if available
+      targetIndex = widget.cameras.indexWhere(
+        (c) => c.lensDirection == CameraLensDirection.front,
+      );
+      if (targetIndex == -1) targetIndex = 0;
+    }
 
     if (_cameraController != null) {
       await _cameraController!.dispose();
@@ -149,6 +156,13 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     } catch (e) {
       debugPrint('Error initializing camera: $e');
     }
+  }
+
+  Future<void> _switchCamera() async {
+    if (widget.cameras.length < 2) return;
+    _liveScanTimer?.cancel();
+    int nextIndex = (_selectedCameraIndex + 1) % widget.cameras.length;
+    await _initializeCamera(cameraIndex: nextIndex);
   }
 
   void _startLiveScanLoop() {
@@ -568,29 +582,57 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
                 },
               ),
 
-              // 3. Top-Left "+" Icon to Register New Face
+              // 3. Top-Left: Add New Face & Switch Camera Buttons
               Positioned(
                 top: 14,
                 left: 14,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _navigateToRegister,
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white24, width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        color: Colors.white,
-                        size: 26,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _navigateToRegister,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white24, width: 1),
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    if (widget.cameras.length > 1) ...[
+                      const SizedBox(width: 10),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _switchCamera,
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white24, width: 1),
+                            ),
+                            child: const Icon(
+                              Icons.cameraswitch_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
 

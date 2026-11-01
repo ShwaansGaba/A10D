@@ -76,6 +76,12 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
     await _initController(index);
   }
 
+  Future<void> _switchCamera() async {
+    if (widget.cameras.length < 2 || _isProcessing) return;
+    int nextIndex = (_selectedCameraIndex + 1) % widget.cameras.length;
+    await _initController(nextIndex);
+  }
+
   Future<void> _initController(int index) async {
     if (_cameraController != null) {
       await _cameraController!.dispose();
@@ -399,6 +405,14 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
           'Register Face (${_currentStep + 1}/3)',
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
+        actions: [
+          if (widget.cameras.length > 1)
+            IconButton(
+              icon: const Icon(Icons.cameraswitch_rounded, color: Colors.white),
+              tooltip: 'Switch Camera',
+              onPressed: _isProcessing ? null : _switchCamera,
+            ),
+        ],
       ),
       body: SafeArea(
         child: Stack(

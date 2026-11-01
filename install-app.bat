@@ -56,26 +56,46 @@ if not defined DEVICE_FOUND (
     )
 )
 
-:: 3. Verify latest compiled APK exists
-set APK_PATH="build\app\outputs\flutter-apk\app-debug.apk"
+:: 3. Detect device architecture & select lightweight optimized release APK
+set TARGET_ABI=arm64-v8a
+for /f "tokens=*" %%i in ('%ADB% shell getprop ro.product.cpu.abi 2^>nul') do (
+    set TARGET_ABI=%%i
+)
 
-if not exist %APK_PATH% (
-    echo [INFO] Pre-compiled APK not found. Building fresh APK now...
-    call flutter build apk --debug
-    if %ERRORLEVEL% NEQ 0 (
-        echo [ERROR] Flutter build failed.
-        pause
-        exit /b 1
+echo Detected device ABI: %TARGET_ABI%
+
+set APK_PATH=build\app\outputs\flutter-apk\app-%TARGET_ABI%-release.apk
+if not exist "%APK_PATH%" (
+    if exist "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" (
+        set APK_PATH=build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
+    ) else if exist "build\app\outputs\flutter-apk\app-release.apk" (
+        set APK_PATH=build\app\outputs\flutter-apk\app-release.apk
+    ) else if exist "build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk" (
+        set APK_PATH=build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk
+    ) else if exist "build\app\outputs\flutter-apk\app-debug.apk" (
+        set APK_PATH=build\app\outputs\flutter-apk\app-debug.apk
+    ) else (
+        echo [INFO] Pre-compiled APK not found. Building optimized release APKs now...
+        call flutter build apk --release --split-per-abi
+        if %ERRORLEVEL% NEQ 0 (
+            echo [ERROR] Flutter build failed.
+            pause
+            exit /b 1
+        )
+        set APK_PATH=build\app\outputs\flutter-apk\app-%TARGET_ABI%-release.apk
+        if not exist "!APK_PATH!" (
+            set APK_PATH=build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
+        )
     )
 )
 
 echo.
-echo Installing latest A10D Kiosk APK onto your phone...
+echo Installing optimized A10D Kiosk APK onto your phone...
 echo Target APK: %APK_PATH%
 echo.
 
 :: 4. Install APK with replace (-r) and downgrade (-d) flags
-%ADB% install -r -d %APK_PATH%
+%ADB% install -r -d "%APK_PATH%"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
