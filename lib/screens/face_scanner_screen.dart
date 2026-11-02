@@ -63,11 +63,33 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     // Clean old temporary frame caches on startup
     FaceRecognitionService().cleanCache();
 
+    SupabaseSyncService().isAccountRevoked.addListener(_onAccountRevocationChanged);
+
     _initializeCamera();
+  }
+
+  void _onAccountRevocationChanged() {
+    if (SupabaseSyncService().isAccountRevoked.value && mounted) {
+      _stopLiveScanLoop();
+      _cameraController?.dispose();
+      _cameraController = null;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => LoginScreen(cameras: widget.cameras)),
+        (route) => false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account has been revoked or deleted. Local biometrics purged.'),
+          backgroundColor: Colors.redAccent,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
+    SupabaseSyncService().isAccountRevoked.removeListener(_onAccountRevocationChanged);
     WidgetsBinding.instance.removeObserver(this);
     _liveScanTimer?.cancel();
     _scannerAnimationController.dispose();

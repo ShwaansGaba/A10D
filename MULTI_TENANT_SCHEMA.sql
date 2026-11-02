@@ -82,6 +82,31 @@ CREATE POLICY "Tenant isolate kiosks" ON public.kiosks
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
+-- 6. Self-service Account Deletion RPC
+-- Allows authenticated users to permanently purge their account and data from auth.users
+CREATE OR REPLACE FUNCTION public.delete_user()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  current_user_id uuid := auth.uid();
+BEGIN
+  IF current_user_id IS NOT NULL THEN
+    DELETE FROM public.attendance_logs WHERE user_id = current_user_id;
+    DELETE FROM public.employees WHERE user_id = current_user_id;
+    BEGIN
+      DELETE FROM public.kiosks WHERE user_id = current_user_id;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    DELETE FROM auth.users WHERE id = current_user_id;
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_user() TO authenticated;
+
 -- ==============================================================
 -- Multi-Tenancy Setup Complete!
 -- ==============================================================

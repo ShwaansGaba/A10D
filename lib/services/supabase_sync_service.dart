@@ -86,6 +86,7 @@ class SupabaseSyncService {
   // Offline queue notifier for UI status indicator
   final ValueNotifier<int> pendingOfflineQueueCount = ValueNotifier<int>(0);
   final ValueNotifier<bool> isNetworkConnected = ValueNotifier<bool>(true);
+  final ValueNotifier<bool> isAccountRevoked = ValueNotifier<bool>(false);
 
   Timer? _queueFlushTimer;
   Timer? _kioskHeartbeatTimer;
@@ -248,8 +249,9 @@ class SupabaseSyncService {
 
   void _startKioskHeartbeat() {
     _kioskHeartbeatTimer?.cancel();
-    _kioskHeartbeatTimer = Timer.periodic(const Duration(seconds: 25), (_) async {
+    _kioskHeartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       if (!_isInitialized) return;
+      await checkAccountRevocation();
       try {
         final devId = await getDeviceId();
         final devName = await getDeviceName();
@@ -267,6 +269,40 @@ class SupabaseSyncService {
         debugPrint('Kiosk heartbeat update notice: $e');
       }
     });
+  }
+
+  /// Live Database & Auth Check: Verifies the account still exists and is not revoked/deleted.
+  /// If revoked or deleted, immediately purges all local biometrics and triggers logout.
+  Future<void> checkAccountRevocation() async {
+    if (!_isInitialized || !isUserLoggedIn) return;
+    try {
+      final userResponse = await Supabase.instance.client.auth.getUser();
+      final user = userResponse.user;
+      if (user == null || (user.userMetadata?['account_deleted'] == true)) {
+        debugPrint('Account revoked or deleted in cloud! Purging local biometrics and logging out...');
+        isAccountRevoked.value = true;
+        await logout();
+      }
+    } on AuthException catch (e) {
+      debugPrint('AuthException during account check: ${e.statusCode} ${e.message}');
+      if (e.statusCode == '401' ||
+          e.statusCode == '403' ||
+          e.message.toLowerCase().contains('not found') ||
+          e.message.toLowerCase().contains('invalid') ||
+          e.message.toLowerCase().contains('revoked')) {
+        isAccountRevoked.value = true;
+        await logout();
+      }
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('user not found') ||
+          errStr.contains('jwt') ||
+          errStr.contains('revoked') ||
+          errStr.contains('unauthorized')) {
+        isAccountRevoked.value = true;
+        await logout();
+      }
+    }
   }
 
   Future<void> logout() async {

@@ -153,22 +153,9 @@ function applyTheme(theme) {
 async function initAuth() {
   if (!supabaseClient) return;
 
-  const signupInProgress = sessionStorage.getItem('a10d_signup_in_progress') === 'true';
-  const savedSignupEmail = sessionStorage.getItem('a10d_signup_email') || '';
-
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session && session.user) {
-      if (signupInProgress) {
-        // User was setting up their password in Step 3! Do not auto-login to dashboard!
-        isSignupInProgress = true;
-        authMode = 'signup';
-        pendingSignupEmail = savedSignupEmail || session.user.email || '';
-        showAuthOverlay();
-        goToSignupStep(3);
-        return;
-      }
-
       handleAuthSuccess(session.user);
     } else {
       showAuthOverlay();
@@ -182,18 +169,10 @@ async function initAuth() {
   supabaseClient.auth.onAuthStateChange((event, session) => {
     console.log('Supabase Auth State Event:', event);
     if (session && session.user) {
-      // CRITICAL: If user is actively signing up, DO NOT bypass Step 3 (password setup)!
-      if (authMode === 'signup' || isSignupInProgress) {
-        console.log('Holding auto-login: user must set account password in Step 3.');
-        return;
-      }
-
       handleAuthSuccess(session.user);
     } else if (event === 'SIGNED_OUT') {
       currentAuthUser = null;
-      if (!isSignupInProgress) {
-        showAuthOverlay();
-      }
+      showAuthOverlay();
     }
   });
 }
@@ -284,23 +263,20 @@ function switchAuthMode(mode) {
   const viewLogin = document.getElementById('auth-view-login');
   const viewSignup1 = document.getElementById('auth-view-signup-1');
   const viewSignup2 = document.getElementById('auth-view-signup-2');
-  const viewSignup3 = document.getElementById('auth-view-signup-3');
   const titleEl = document.getElementById('auth-form-title');
   const subtitleEl = document.getElementById('auth-form-subtitle');
 
   if (mode === 'login') {
     isSignupInProgress = false;
-    sessionStorage.removeItem('a10d_signup_in_progress');
     if (titleEl) titleEl.textContent = 'Sign in';
     if (subtitleEl) subtitleEl.textContent = 'Enter your credentials to access your workspace';
 
     if (viewLogin) viewLogin.classList.remove('hidden');
     if (viewSignup1) viewSignup1.classList.add('hidden');
     if (viewSignup2) viewSignup2.classList.add('hidden');
-    if (viewSignup3) viewSignup3.classList.add('hidden');
   } else {
     if (titleEl) titleEl.textContent = 'Create Account';
-    if (subtitleEl) subtitleEl.textContent = 'Set up your A10D workspace in 3 quick steps';
+    if (subtitleEl) subtitleEl.textContent = 'Set up your A10D workspace in 2 quick steps';
 
     goToSignupStep(1);
   }
@@ -314,32 +290,26 @@ function goToSignupStep(step) {
   const viewLogin = document.getElementById('auth-view-login');
   const viewSignup1 = document.getElementById('auth-view-signup-1');
   const viewSignup2 = document.getElementById('auth-view-signup-2');
-  const viewSignup3 = document.getElementById('auth-view-signup-3');
   const titleEl = document.getElementById('auth-form-title');
   const subtitleEl = document.getElementById('auth-form-subtitle');
 
   if (viewLogin) viewLogin.classList.add('hidden');
   if (viewSignup1) viewSignup1.classList.add('hidden');
   if (viewSignup2) viewSignup2.classList.add('hidden');
-  if (viewSignup3) viewSignup3.classList.add('hidden');
 
   if (step === 1) {
     if (titleEl) titleEl.textContent = 'Create Account';
-    if (subtitleEl) subtitleEl.textContent = 'Step 1 of 3: Enter your organization email';
+    if (subtitleEl) subtitleEl.textContent = 'Set up your A10D workspace in 2 quick steps';
     if (viewSignup1) viewSignup1.classList.remove('hidden');
   } else if (step === 2) {
-    if (titleEl) titleEl.textContent = 'Verify Code';
-    if (subtitleEl) subtitleEl.textContent = 'Step 2 of 3: Enter the OTP sent to your email';
+    if (titleEl) titleEl.textContent = 'Verify Email';
+    if (subtitleEl) subtitleEl.textContent = 'Enter the 6-digit confirmation code sent to your email';
     if (viewSignup2) viewSignup2.classList.remove('hidden');
     const emailDisp = document.getElementById('otp-target-email');
     if (emailDisp) emailDisp.innerText = pendingSignupEmail;
     clearOtpBoxes();
     focusFirstOtpBox();
     startResendCountdown();
-  } else if (step === 3) {
-    if (titleEl) titleEl.textContent = 'Create Password';
-    if (subtitleEl) subtitleEl.textContent = 'Step 3 of 3: Secure your administrator account';
-    if (viewSignup3) viewSignup3.classList.remove('hidden');
   }
   safeCreateIcons();
 }
@@ -488,7 +458,7 @@ async function handleLoginSubmit(e) {
   }
 }
 
-// Sign Up - Step 1: Submit Email for OTP
+// Sign Up - Step 1: Submit Work Email, Password & Workspace
 async function handleSignupStep1Submit(e) {
   e.preventDefault();
   hideAuthAlert();
@@ -498,62 +468,84 @@ async function handleSignupStep1Submit(e) {
   }
 
   const emailInput = document.getElementById('signup-email');
+  const passInput = document.getElementById('signup-password');
+  const companyInput = document.getElementById('signup-company');
+
   const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+  const password = passInput ? passInput.value : '';
+  const company = companyInput ? companyInput.value.trim() : '';
+
   if (!email || !email.includes('@')) {
     showAuthAlert('Please enter a valid work email address.');
     return;
   }
 
+  if (!password || password.length < 6) {
+    showAuthAlert('Password must be at least 6 characters long.');
+    return;
+  }
+
   pendingSignupEmail = email;
   const btn = document.getElementById('signup-1-btn');
-  const originalHtml = btn ? btn.innerHTML : '<span>Send Verification Code</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Create Account & Send Code</span>';
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span>Checking Email...</span>';
+    btn.innerHTML = '<span>Creating Account & Sending Code...</span>';
   }
   safeCreateIcons();
 
   try {
-    // 1. Check if email is already active in Supabase
-    const { data: checkData, error: checkError } = await supabaseClient.auth.signInWithOtp({
-      email: pendingSignupEmail,
+    const redirectUrl = window.location.origin ? (window.location.origin + window.location.pathname) : undefined;
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
       options: {
-        shouldCreateUser: false,
+        data: {
+          company_name: company || 'A10D Workspace',
+          account_deleted: false,
+        },
+        emailRedirectTo: redirectUrl,
       }
     });
 
-    if (!checkError) {
-      // Email is ALREADY registered and active in Supabase!
-      const loginEmailInput = document.getElementById('login-email');
-      if (loginEmailInput) loginEmailInput.value = pendingSignupEmail;
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('user already registered')) {
+        const loginEmail = document.getElementById('login-email');
+        if (loginEmail) loginEmail.value = email;
+        switchAuthMode('login');
+        showAuthAlert('This email is already registered. Please sign in with your password.', 'error');
+        return;
+      }
+      throw error;
+    }
 
+    // In Supabase, if email confirmation is required and user already exists,
+    // signUp() doesn't throw an error but returns user with empty identities: []
+    if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      const loginEmail = document.getElementById('login-email');
+      if (loginEmail) loginEmail.value = email;
       switchAuthMode('login');
       showAuthAlert('This email is already registered. Please sign in with your password.', 'error');
       return;
     }
 
-    // 2. Email is not active or ready for fresh registration. Dispatch OTP code with shouldCreateUser: true
-    if (btn) {
-      btn.innerHTML = '<span>Sending Code...</span>';
+    // If Supabase project has email confirmation turned off, session is returned immediately
+    if (data && data.session && data.user) {
+      handleAuthSuccess(data.user);
+      return;
     }
-    const redirectUrl = window.location.origin ? (window.location.origin + window.location.pathname) : undefined;
-    const { data, error } = await supabaseClient.auth.signInWithOtp({
-      email: pendingSignupEmail,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: redirectUrl,
-      }
-    });
 
-    if (error) throw error;
+    // Move cleanly to Step 2 for OTP confirmation
     goToSignupStep(2);
+    showAuthAlert('A 6-digit verification code has been sent to ' + email + '. Please check your email.', 'success');
   } catch (err) {
-    console.error('OTP Send Error:', err);
+    console.error('Signup Step 1 Error:', err);
     let msg = err.message || 'Failed to dispatch verification code.';
     if (msg.includes('Error sending confirmation email')) {
-      msg = 'Supabase Email Dispatch Failed (500): Built-in email rate limit (3/hr) exceeded, or custom SMTP / template syntax needs setup in Supabase Dashboard.';
+      msg = 'Email dispatch limit reached (3/hr) on default Supabase SMTP. Please configure custom SMTP or try again shortly.';
     }
-    showAuthAlert(msg);
+    showAuthAlert(msg, 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -563,7 +555,7 @@ async function handleSignupStep1Submit(e) {
   }
 }
 
-// Sign Up - Step 2: Verify 6 or 8-Digit OTP
+// Sign Up - Step 2: Verify 6-Digit OTP Code
 async function handleSignupStep2Submit(e) {
   e.preventDefault();
   hideAuthAlert();
@@ -571,12 +563,12 @@ async function handleSignupStep2Submit(e) {
 
   const otp = getEnteredOtp();
   if (!otp || otp.length < 6) {
-    showAuthAlert('Please enter the full verification code from your email (at least 6 digits).');
+    showAuthAlert('Please enter the 6-digit confirmation code from your email.');
     return;
   }
 
   const btn = document.getElementById('signup-2-btn');
-  const originalHtml = btn ? btn.innerHTML : '<span>Verify Code</span>';
+  const originalHtml = btn ? btn.innerHTML : '<span>Verify & Enter Workspace</span>';
   if (btn) {
     btn.disabled = true;
     btn.innerHTML = '<span>Verifying Code...</span>';
@@ -584,41 +576,41 @@ async function handleSignupStep2Submit(e) {
   safeCreateIcons();
 
   try {
-    // Explicitly lock into signup flow so onAuthStateChange does NOT skip password setup
-    isSignupInProgress = true;
-    sessionStorage.setItem('a10d_signup_in_progress', 'true');
-    sessionStorage.setItem('a10d_signup_email', pendingSignupEmail);
-
-    // Attempt verification with type: 'email' (standard for signInWithOtp)
-    let res = await supabaseClient.auth.verifyOtp({
+    // Primary: verifyOtp with type: 'signup' (matches supabase.auth.signUp confirmation token)
+    let { data, error } = await supabaseClient.auth.verifyOtp({
       email: pendingSignupEmail,
       token: otp,
-      type: 'email',
+      type: 'signup',
     });
 
-    // If type 'email' failed, attempt type 'signup' (in case GoTrue tagged it under signup confirmation)
-    if (res.error) {
-      console.warn('verifyOtp with type email returned error, trying type signup fallback...', res.error);
-      const resSignup = await supabaseClient.auth.verifyOtp({
+    // Fallback: if 'signup' type fails, try 'email' in case project is using magiclink/email OTP
+    if (error) {
+      console.warn('verifyOtp signup type returned error, trying fallback type email...', error);
+      const resEmail = await supabaseClient.auth.verifyOtp({
         email: pendingSignupEmail,
         token: otp,
-        type: 'signup',
+        type: 'email',
       });
-      if (!resSignup.error) {
-        res = resSignup;
-      } else {
-        throw res.error;
+      if (!resEmail.error) {
+        data = resEmail.data;
+        error = null;
       }
     }
 
-    if (res.error) throw res.error;
+    if (error) throw error;
 
-    // Ensure auth container is visible and explicitly advance to Step 3 (Password Setup)
-    showAuthOverlay();
-    goToSignupStep(3);
+    const activeUser = data?.user || (await supabaseClient.auth.getUser()).data.user;
+    if (!activeUser) {
+      throw new Error('Verification completed, but active session was not returned. Please sign in with your password.');
+    }
+
+    // Clean up flags and enter workspace
+    isSignupInProgress = false;
+    authMode = 'login';
+    handleAuthSuccess(activeUser);
   } catch (err) {
     console.error('OTP Verify Error:', err);
-    showAuthAlert(err.message || 'Invalid or expired verification code. Please check your email and try again.');
+    showAuthAlert(err.message || 'Invalid or expired confirmation code. Please check your email and try again.', 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -628,78 +620,9 @@ async function handleSignupStep2Submit(e) {
   }
 }
 
-// Sign Up - Step 3: Set Password & Authorize Admin
+// Retained as stub for backwards compatibility
 async function handleSignupStep3Submit(e) {
-  e.preventDefault();
-  hideAuthAlert();
-  if (!supabaseClient) return;
-
-  const pass1Input = document.getElementById('signup-password') || document.getElementById('signup-pass-1');
-  const pass2Input = document.getElementById('signup-confirm-password') || document.getElementById('signup-pass-2');
-  const pass1 = pass1Input ? pass1Input.value : '';
-  const pass2 = pass2Input ? pass2Input.value : '';
-
-  if (pass1.length < 6) {
-    showAuthAlert('Password must be at least 6 characters long.');
-    return;
-  }
-
-  if (pass1 !== pass2) {
-    showAuthAlert('Passwords do not match. Please re-type carefully.');
-    return;
-  }
-
-  const humanCheck = document.getElementById('human-verify-check');
-  if (humanCheck && !humanCheck.checked) {
-    showAuthAlert('Please check the authorization confirmation box to proceed.');
-    return;
-  }
-
-  const btn = document.getElementById('signup-3-btn');
-  const originalHtml = btn ? btn.innerHTML : '<span>Complete Setup & Log In</span>';
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span>Saving Password & Activating...</span>';
-  }
-  safeCreateIcons();
-
-  try {
-    // 1. Set the user's permanent password in Supabase Auth & clear account_deleted metadata
-    const { data, error } = await supabaseClient.auth.updateUser({
-      password: pass1,
-      data: {
-        account_deleted: false,
-        recreated_at: new Date().toISOString()
-      }
-    });
-
-    if (error) throw error;
-
-    try {
-      localStorage.removeItem('a10d_deleted_accounts');
-    } catch (_) {}
-
-    // 3. Clear signup flags
-    isSignupInProgress = false;
-    authMode = 'login';
-    sessionStorage.removeItem('a10d_signup_in_progress');
-    sessionStorage.removeItem('a10d_signup_email');
-
-    // 4. User now has a confirmed password set! Transition to dashboard
-    const activeUser = data.user || (await supabaseClient.auth.getUser()).data.user;
-    handleAuthSuccess(activeUser);
-
-    showPunchToast({ employee_name: 'Password set successfully! Welcome to A10D.' });
-  } catch (err) {
-    console.error('Password Update Error:', err);
-    showAuthAlert(err.message || 'Failed to finalize account password. Please try again.');
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = originalHtml;
-    }
-    safeCreateIcons();
-  }
+  if (e) e.preventDefault();
 }
 
 // Resend OTP Code
@@ -709,14 +632,21 @@ async function resendOtpCode() {
   if (btn && btn.disabled) return;
 
   try {
-    await supabaseClient.auth.signInWithOtp({
+    const { error } = await supabaseClient.auth.resend({
+      type: 'signup',
       email: pendingSignupEmail,
-      options: { shouldCreateUser: true }
     });
-    showAuthAlert('A fresh verification code has been sent to your email.', 'success');
+    if (error) {
+      // Fallback
+      await supabaseClient.auth.signInWithOtp({
+        email: pendingSignupEmail,
+        options: { shouldCreateUser: false },
+      });
+    }
+    showAuthAlert('A fresh verification code has been sent to ' + pendingSignupEmail, 'success');
     startResendCountdown();
   } catch (err) {
-    showAuthAlert(err.message || 'Could not resend code.');
+    showAuthAlert(err.message || 'Could not resend code. Please wait a minute and try again.');
   }
 }
 
