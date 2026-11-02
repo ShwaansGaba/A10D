@@ -1476,58 +1476,57 @@ async function executeAccountDeletion() {
     const userId = currentAuthUser.id;
     const userEmail = (currentAuthUser.email || '').toLowerCase().trim();
 
-    // 1. Delete all attendance logs for this user/tenant
+    // 1. Delete all attendance logs
     try {
-      const logIds = (attendanceLogs || []).map(l => l.id).filter(Boolean);
-      if (logIds.length > 0) {
-        await supabaseClient.from('attendance_logs').delete().in('id', logIds);
-      }
+      await supabaseClient.from('attendance_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     } catch (e) {
       console.warn('Attendance logs delete error:', e.message);
     }
 
-    // 2. Delete all employees and facial profiles for this user/tenant
+    // 2. Delete all employees and facial profiles
     try {
-      const empIds = (employeesList || []).map(e => e.id).filter(Boolean);
-      if (empIds.length > 0) {
-        await supabaseClient.from('employees').delete().in('id', empIds);
-      }
+      await supabaseClient.from('employees').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     } catch (e) {
       console.warn('Employees delete error:', e.message);
     }
 
-    // 3. Delete all kiosks for this user/tenant (if table exists)
+    // 3. Delete all kiosks (if table exists)
     try {
-      await supabaseClient.from('kiosks').delete().eq('user_id', userId);
+      await supabaseClient.from('kiosks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     } catch (_) {}
 
-    // 4. Call server-side SECURITY DEFINER RPC delete_user() to permanently purge user from auth.users
-    let rpcPurged = false;
-    try {
-      const { error: rpcError } = await supabaseClient.rpc('delete_user');
-      if (!rpcError) {
-        rpcPurged = true;
-        console.log('User record permanently purged from auth.users via database RPC.');
-      } else {
-        console.warn('delete_user RPC notice:', rpcError.message);
-      }
-    } catch (e) {
-      console.warn('delete_user RPC execution notice:', e);
-    }
-
-    // 5. If RPC is not yet enabled, scramble credentials and flag account_deleted in metadata
-    if (!rpcPurged) {
-      const unguessablePassword = 'DELETED_' + crypto.randomUUID() + '_' + Math.random().toString(36) + '_' + Date.now();
+    // 4. Permanently delete user from auth.users via Supabase Auth Admin API (ZERO TRACE)
+    let userPurged = false;
+    if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.serviceKey) {
       try {
-        await supabaseClient.auth.updateUser({
-          password: unguessablePassword,
-          data: {
-            account_deleted: true,
-            deleted_at: new Date().toISOString()
+        const adminDeleteRes = await fetch(`${SUPABASE_CONFIG.url}/auth/v1/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'apikey': SUPABASE_CONFIG.serviceKey,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.serviceKey}`
           }
         });
+        if (adminDeleteRes.ok || adminDeleteRes.status === 200 || adminDeleteRes.status === 204) {
+          userPurged = true;
+          console.log(`User ${userId} permanently and entirely deleted from auth.users via Admin API.`);
+        }
+      } catch (adminErr) {
+        console.warn('Admin user purge notice:', adminErr.message);
+      }
+    }
+
+    // 5. Secondary fallback: call SECURITY DEFINER RPC delete_user()
+    if (!userPurged) {
+      try {
+        const { error: rpcError } = await supabaseClient.rpc('delete_user');
+        if (!rpcError) {
+          userPurged = true;
+          console.log('User record permanently purged from auth.users via database RPC.');
+        } else {
+          console.warn('delete_user RPC notice:', rpcError.message);
+        }
       } catch (e) {
-        console.warn('Credentials invalidation notice:', e.message);
+        console.warn('delete_user RPC execution notice:', e);
       }
     }
 

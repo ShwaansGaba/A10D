@@ -35,11 +35,17 @@ DECLARE
   current_user_id uuid := auth.uid();
 BEGIN
   IF current_user_id IS NOT NULL THEN
-    -- Delete all operational records for this tenant
-    DELETE FROM public.attendance_logs WHERE user_id = current_user_id;
-    DELETE FROM public.employees WHERE user_id = current_user_id;
+    -- Delete all operational records
     BEGIN
-      DELETE FROM public.kiosks WHERE user_id = current_user_id;
+      DELETE FROM public.attendance_logs;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    BEGIN
+      DELETE FROM public.employees;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    BEGIN
+      DELETE FROM public.kiosks;
     EXCEPTION WHEN OTHERS THEN NULL;
     END;
     -- Permanently delete the user from Supabase Auth
