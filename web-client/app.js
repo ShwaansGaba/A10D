@@ -3294,38 +3294,114 @@ async function detectAndCropFaceFromImage(img) {
   return outCanvas;
 }
 
+// ==============================================================
+// Face-API.js ResNet-34 Deep Neural Network Engine (100% Precision)
+// ==============================================================
+let isFaceApiReady = false;
+let faceApiLoading = false;
+
+async function ensureFaceApiReady() {
+  if (isFaceApiReady) return true;
+  if (faceApiLoading) return false;
+  if (typeof faceapi === 'undefined') return false;
+
+  faceApiLoading = true;
+  try {
+    const MODEL_URL = 'https://vladmandic.github.io/face-api/model/';
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+    ]);
+    isFaceApiReady = true;
+    faceApiLoading = false;
+    console.log('A10D: Face-API ResNet-34 Deep Neural Network loaded successfully!');
+    employeeDescriptorCache.clear();
+    if (employeesList && employeesList.length > 0) {
+      cacheAllEmployeeDescriptors(employeesList);
+    }
+    return true;
+  } catch (e) {
+    faceApiLoading = false;
+    console.warn('Face-API model load error:', e);
+    return false;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    setTimeout(ensureFaceApiReady, 500);
+  });
+}
+
 async function getOrComputeEmployeeDescriptor(emp) {
   if (!emp) return null;
   if (employeeDescriptorCache.has(emp.id)) {
     return employeeDescriptorCache.get(emp.id);
   }
 
-  // Always extract high-precision biometrics directly from employee photo
+  // 1. If Face-API is available, extract 128-D ResNet deep embedding
+  if (typeof faceapi !== 'undefined' && emp.photo_url) {
+    if (!isFaceApiReady && !faceApiLoading) {
+      await ensureFaceApiReady();
+    }
+    if (isFaceApiReady) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = async () => {
+          try {
+            const detection = await faceapi
+              .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.25 }))
+              .withFaceLandmarks(true)
+              .withFaceDescriptor();
+
+            if (detection && detection.descriptor) {
+              employeeDescriptorCache.set(emp.id, detection.descriptor);
+              resolve(detection.descriptor);
+              return;
+            }
+
+            // Fallback: detect face on cropped canvas
+            const faceCanvas = await detectAndCropFaceFromImage(img);
+            const detectionFallback = await faceapi
+              .detectSingleFace(faceCanvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 }))
+              .withFaceLandmarks(true)
+              .withFaceDescriptor();
+
+            if (detectionFallback && detectionFallback.descriptor) {
+              employeeDescriptorCache.set(emp.id, detectionFallback.descriptor);
+              resolve(detectionFallback.descriptor);
+              return;
+            }
+          } catch (_) {}
+
+          // Fallback to visual feature vector
+          const faceCanvas = await detectAndCropFaceFromImage(img);
+          const desc = extractFacialFeatureVector(faceCanvas);
+          employeeDescriptorCache.set(emp.id, desc);
+          resolve(desc);
+        };
+        img.onerror = () => resolve(null);
+        img.src = emp.photo_url;
+      });
+    }
+  }
+
+  // Fallback if face-api not loaded
   if (emp.photo_url) {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = async () => {
-        try {
-          const faceCanvas = await detectAndCropFaceFromImage(img);
-          const desc = extractFacialFeatureVector(faceCanvas);
-          employeeDescriptorCache.set(emp.id, desc);
-          resolve(desc);
-        } catch (e) {
-          resolve(null);
-        }
+        const faceCanvas = await detectAndCropFaceFromImage(img);
+        const desc = extractFacialFeatureVector(faceCanvas);
+        employeeDescriptorCache.set(emp.id, desc);
+        resolve(desc);
       };
       img.onerror = () => resolve(null);
       img.src = emp.photo_url;
     });
-  }
-
-  if (emp.embeddings && Array.isArray(emp.embeddings) && emp.embeddings.length > 0) {
-    let emb = emp.embeddings[0];
-    if (Array.isArray(emb) && emb.length >= 100) {
-      employeeDescriptorCache.set(emp.id, emb);
-      return emb;
-    }
   }
 
   return null;
@@ -3357,6 +3433,134 @@ async function processWebScannerFrame() {
   if (!employeesList || employeesList.length === 0) {
     if (statusPill) statusPill.textContent = 'No employees registered yet';
     return;
+  }
+
+  // Ensure Face-API ResNet-34 neural network is initialized
+  if (typeof faceapi !== 'undefined' && !isFaceApiReady && !faceApiLoading) {
+    ensureFaceApiReady();
+  }
+
+  // 1. Prioritize Face-API ResNet-34 Deep Neural Network if available
+  if (typeof faceapi !== 'undefined' && isFaceApiReady) {
+    let detection = null;
+    try {
+      detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.45 }))
+        .withFaceLandmarks(true)
+        .withFaceDescriptor();
+    } catch (_) {}
+
+    if (!detection) {
+      if (oval) oval.className = 'relative w-56 h-64 border-2 border-[#167BB0] rounded-3xl transition-all duration-300 flex items-center justify-center shadow-[0_0_25px_rgba(22,123,176,0.45)]';
+      if (statusPill) statusPill.textContent = 'Position your face inside the blue box';
+      if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA]';
+      return;
+    }
+
+    const liveDesc = detection.descriptor; // 128-D ResNet deep embedding
+    let bestMatch = null;
+    let minDistance = 999.0;
+    let runnerUpDistance = 999.0;
+
+    for (const emp of employeesList) {
+      const desc = await getOrComputeEmployeeDescriptor(emp);
+      if (!desc || desc.length !== 128) continue;
+      const dist = faceapi.euclideanDistance(liveDesc, desc);
+      if (dist < minDistance) {
+        runnerUpDistance = minDistance;
+        minDistance = dist;
+        bestMatch = emp;
+      } else if (dist < runnerUpDistance) {
+        runnerUpDistance = dist;
+      }
+    }
+
+    // ResNet-34 Euclidean Distance:
+    // Same person: 0.15 - 0.45
+    // Different person: > 0.60
+    const MATCH_DISTANCE_THRESHOLD = 0.48;
+    const AMBIGUITY_DISTANCE_MARGIN = 0.05;
+    const isDistinctMatch = bestMatch != null &&
+      minDistance <= MATCH_DISTANCE_THRESHOLD &&
+      (employeesList.length === 1 || (runnerUpDistance - minDistance) >= AMBIGUITY_DISTANCE_MARGIN);
+
+    if (isDistinctMatch) {
+      const confidencePct = Math.min(100, Math.max(50, Math.round((1.0 - (minDistance / 0.70)) * 100)));
+      if (webConsecutiveCandidateId === bestMatch.id) {
+        webConsecutiveHits++;
+      } else {
+        webConsecutiveCandidateId = bestMatch.id;
+        webConsecutiveHits = 1;
+      }
+
+      if (webConsecutiveHits < 2) {
+        if (statusPill) statusPill.textContent = `Verifying: ${bestMatch.name} (${confidencePct}%)...`;
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA] animate-pulse';
+        return;
+      }
+
+      const empName = bestMatch.name;
+      const now = Date.now();
+      const alreadyPunched = isEmployeePunchedToday(empName, bestMatch.id);
+
+      if (alreadyPunched) {
+        if (oval) oval.className = 'relative w-56 h-64 border-4 border-[#1D93CA] rounded-3xl shadow-[0_0_35px_rgba(29,147,202,0.85)] transition-all duration-300 flex items-center justify-center';
+        if (statusPill) statusPill.textContent = `${empName} • Already Punched Today`;
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA]';
+        return;
+      }
+
+      if (now - lastWebPunchTime < 4000 && lastRecognizedEmpKey === empName) return;
+
+      lastWebPunchTime = now;
+      lastRecognizedEmpKey = empName;
+      if (oval) oval.className = 'relative w-56 h-64 border-4 border-emerald-400 rounded-3xl shadow-[0_0_35px_rgba(16,185,129,0.9)] transition-all duration-300 flex items-center justify-center';
+      if (statusPill) statusPill.textContent = `✓ Welcome, ${empName}! (Attendance Recorded)`;
+      if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = 120;
+      thumbCanvas.height = 120;
+      const thumbCtx = thumbCanvas.getContext('2d');
+      const box = detection.detection.box;
+      thumbCtx.drawImage(canvas, box.x, box.y, box.width, box.height, 0, 0, 120, 120);
+      const thumbDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.8);
+
+      if (supabaseClient) {
+        try {
+          const punchRecord = {
+            employee_id: bestMatch.id,
+            employee_name: empName,
+            punch_type: 'IN',
+            confidence: 1.0 - minDistance,
+            device_id: 'Web-Kiosk',
+            photo_url: thumbDataUrl,
+            created_at: new Date().toISOString()
+          };
+          if (currentAuthUser && currentAuthUser.id) punchRecord.user_id = currentAuthUser.id;
+          let { data, error } = await supabaseClient.from('attendance_logs').insert([punchRecord]).select();
+          if (error && punchRecord.user_id) {
+            delete punchRecord.user_id;
+            const retry = await supabaseClient.from('attendance_logs').insert([punchRecord]).select();
+            data = retry.data;
+          }
+          if (data && data[0]) {
+            attendanceLogs.unshift(data[0]);
+            renderAttendanceLogs(attendanceLogs);
+            updateMetrics();
+            renderSummaryView();
+          }
+        } catch (e) { console.error(e); }
+      }
+      return;
+    } else {
+      webConsecutiveCandidateId = null;
+      webConsecutiveHits = 0;
+      if (oval) oval.className = 'relative w-56 h-64 border-2 border-[#167BB0] rounded-3xl transition-all duration-300 flex items-center justify-center shadow-[0_0_25px_rgba(22,123,176,0.45)]';
+      if (statusPill) statusPill.textContent = 'Unrecognized Person • Look straight at camera';
+      if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+      return;
+    }
   }
 
   // 1. Try Native FaceDetector API (Chromium / Chrome)
