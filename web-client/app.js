@@ -2550,7 +2550,7 @@ function stopWebScanner() {
   if (statusPill) statusPill.textContent = 'Webcam stopped';
   if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-gray-500';
   if (oval) {
-    oval.className = 'w-56 h-72 border-2 border-dashed border-cyan-400/70 rounded-[50%] transition-all duration-300 flex items-center justify-center';
+    oval.className = 'relative w-56 h-64 border-2 border-[#167BB0] rounded-3xl transition-all duration-300 flex items-center justify-center shadow-[0_0_25px_rgba(22,123,176,0.45)]';
   }
 }
 
@@ -2617,13 +2617,13 @@ async function processWebScannerFrame() {
   const hasFace = detectedFaceBox != null || skinRatio > 0.15;
 
   if (!hasFace) {
-    if (oval) oval.className = 'w-56 h-72 border-2 border-dashed border-cyan-400/60 rounded-[50%] transition-all duration-300 flex items-center justify-center';
-    if (statusPill) statusPill.textContent = 'Position your face inside the oval';
-    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-400';
+    if (oval) oval.className = 'relative w-56 h-64 border-2 border-[#167BB0] rounded-3xl transition-all duration-300 flex items-center justify-center shadow-[0_0_25px_rgba(22,123,176,0.45)]';
+    if (statusPill) statusPill.textContent = 'Position your face inside the blue box';
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA]';
     return;
   }
 
-  // A live face is detected in the oval!
+  // A live face is detected in the blue box!
   // Find closest matching enrolled employee
   let bestMatch = null;
   let highestScore = 0.0;
@@ -2648,9 +2648,9 @@ async function processWebScannerFrame() {
     const alreadyPunched = isEmployeePunchedToday(empName, bestMatch.id);
 
     if (alreadyPunched) {
-      if (oval) oval.className = 'w-56 h-72 border-4 border-cyan-400 rounded-[50%] shadow-[0_0_30px_rgba(24,255,255,0.7)] transition-all duration-300 flex items-center justify-center';
+      if (oval) oval.className = 'relative w-56 h-64 border-4 border-[#1D93CA] rounded-3xl shadow-[0_0_35px_rgba(29,147,202,0.85)] transition-all duration-300 flex items-center justify-center';
       if (statusPill) statusPill.textContent = `${empName} • Already Punched Today`;
-      if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-400';
+      if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA]';
       return;
     }
 
@@ -2663,10 +2663,10 @@ async function processWebScannerFrame() {
     lastWebPunchTime = now;
     lastRecognizedEmpKey = empName;
 
-    // Green oval glow
-    if (oval) oval.className = 'w-56 h-72 border-4 border-green-400 rounded-[50%] shadow-[0_0_35px_rgba(0,230,118,0.9)] transition-all duration-300 flex items-center justify-center';
+    // Green box glow
+    if (oval) oval.className = 'relative w-56 h-64 border-4 border-emerald-400 rounded-3xl shadow-[0_0_35px_rgba(16,185,129,0.9)] transition-all duration-300 flex items-center justify-center';
     if (statusPill) statusPill.textContent = `✓ Welcome, ${empName}! (Attendance Recorded)`;
-    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
 
     // Play synthesized harmonic chime & voice
     playWebChime();

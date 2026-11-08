@@ -541,14 +541,14 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
         _selectedCameraIndex >= 0 &&
         widget.cameras[_selectedCameraIndex].lensDirection == CameraLensDirection.front;
 
-    // Border color: Green on successful punch, Cyan on already punched, or default
+    // Border color: Green on successful punch, Royal Blue on already punched, or Default Blue
     final Color reticleColor = isPersonRecognized
         ? (_isLivenessPassed
             ? (_lastPunchStatus == PunchStatus.alreadyPunchedToday
-                ? const Color(0xFF00E5FF)
+                ? const Color(0xFF1D93CA)
                 : const Color(0xFF00E676))
             : Colors.amberAccent)
-        : Colors.cyanAccent.withValues(alpha: 0.65);
+        : const Color(0xFF1D93CA);
 
     return Scaffold(
       backgroundColor: Colors.black,

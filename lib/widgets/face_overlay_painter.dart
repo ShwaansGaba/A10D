@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 
 /// Custom painter that creates a semi-transparent dark vignette with
-/// an oval cutout guide and corner accent brackets for face positioning.
+/// a blue-colored rectangular bounding box cutout guide and corner accent brackets
+/// for face positioning and recognition.
 class FaceOverlayPainter extends CustomPainter {
   final double animationValue;
   final bool isScanning;
   final Color borderColor;
   final Color cornerColor;
+  final Rect? detectedFaceRect;
 
   FaceOverlayPainter({
     required this.animationValue,
     this.isScanning = true,
-    this.borderColor = const Color(0xFF18FFFF),
-    this.cornerColor = Colors.white,
+    this.borderColor = const Color(0xFF1D93CA),
+    this.cornerColor = const Color(0xFF1D93CA),
+    this.detectedFaceRect,
   });
 
   @override
@@ -21,75 +24,75 @@ class FaceOverlayPainter extends CustomPainter {
       ..color = Colors.black.withValues(alpha: 0.65)
       ..style = PaintingStyle.fill;
 
-    // Define the face scanning oval in the upper-center area
-    final ovalWidth = size.width * 0.72;
-    final ovalHeight = size.height * 0.44;
+    // Define the face scanning rectangular box in the upper-center area
+    final boxWidth = size.width * 0.72;
+    final boxHeight = size.height * 0.44;
     final center = Offset(size.width / 2, size.height * 0.38);
-    final ovalRect = Rect.fromCenter(
+    final boxRect = Rect.fromCenter(
       center: center,
-      width: ovalWidth,
-      height: ovalHeight,
+      width: boxWidth,
+      height: boxHeight,
     );
+    final boxRRect = RRect.fromRectAndRadius(boxRect, const Radius.circular(22));
 
-    // Punch out the oval from the dark overlay
+    // Punch out the rounded rectangular box from the dark overlay
     final backgroundPath = Path()
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    final ovalPath = Path()..addOval(ovalRect);
+    final boxPath = Path()..addRRect(boxRRect);
     final transparentHolePath = Path.combine(
       PathOperation.difference,
       backgroundPath,
-      ovalPath,
+      boxPath,
     );
 
     canvas.drawPath(transparentHolePath, backgroundPaint);
 
-    // Outer border ring for the face target
+    // Blue rectangular border for the face target
     final borderPaint = Paint()
       ..color = borderColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5;
+      ..strokeWidth = 3.2;
 
-    canvas.drawOval(ovalRect, borderPaint);
+    canvas.drawRRect(boxRRect, borderPaint);
 
-    // Animated scanning line inside the oval
+    // Animated scanning line inside the box
     if (isScanning) {
-      final scanLineY =
-          ovalRect.top + (ovalRect.height * animationValue);
+      final scanLineY = boxRect.top + (boxRect.height * animationValue);
       final scanLinePaint = Paint()
         ..shader = LinearGradient(
           colors: [
             Colors.transparent,
-            borderColor.withValues(alpha: 0.9),
+            borderColor.withValues(alpha: 0.8),
             borderColor,
-            borderColor.withValues(alpha: 0.9),
+            borderColor.withValues(alpha: 0.8),
             Colors.transparent,
           ],
         ).createShader(
-          Rect.fromLTWH(ovalRect.left, scanLineY, ovalRect.width, 3),
+          Rect.fromLTWH(boxRect.left, scanLineY, boxRect.width, 3),
         )
         ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke;
 
-      // Restrict the scan line within the oval bounds
+      // Restrict the scan line within the box bounds
       canvas.save();
-      canvas.clipPath(ovalPath);
+      canvas.clipPath(boxPath);
       canvas.drawLine(
-        Offset(ovalRect.left, scanLineY),
-        Offset(ovalRect.right, scanLineY),
+        Offset(boxRect.left, scanLineY),
+        Offset(boxRect.right, scanLineY),
         scanLinePaint,
       );
       canvas.restore();
     }
 
-    // Corner guides around the face oval
+    // High-tech corner guides around the blue face box
     final cornerPaint = Paint()
       ..color = cornerColor
-      ..strokeWidth = 4.0
+      ..strokeWidth = 4.5
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    const padding = 14.0;
-    final bracketRect = ovalRect.inflate(padding);
+    const padding = 10.0;
+    final bracketRect = boxRect.inflate(padding);
     const bracketLen = 28.0;
 
     // Top-left bracket
@@ -146,6 +149,7 @@ class FaceOverlayPainter extends CustomPainter {
     return oldDelegate.animationValue != animationValue ||
         oldDelegate.isScanning != isScanning ||
         oldDelegate.borderColor != borderColor ||
-        oldDelegate.cornerColor != cornerColor;
+        oldDelegate.cornerColor != cornerColor ||
+        oldDelegate.detectedFaceRect != detectedFaceRect;
   }
 }
