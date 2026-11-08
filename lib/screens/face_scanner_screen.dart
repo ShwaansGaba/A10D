@@ -39,6 +39,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
   DateTime? _lastRecognizedTime;
   String? _consecutiveCandidateId;
   int _consecutiveMatchCount = 0;
+  final List<double> _confidenceHistory = [];
 
   // Kiosk Inactivity Dimming State
   DateTime _lastFaceActivityTime = DateTime.now();
@@ -246,19 +247,36 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
       if (result.isRecognized && result.user != null) {
         final user = result.user!;
 
-        // 2-frame consecutive agreement filter to eliminate transient false positives
+        // Enterprise Temporal Confidence Accumulator (Sliding Window Voting)
         if (_consecutiveCandidateId == user.id) {
           _consecutiveMatchCount++;
+          _confidenceHistory.add(result.confidence);
+          if (_confidenceHistory.length > 3) _confidenceHistory.removeAt(0);
         } else {
           _consecutiveCandidateId = user.id;
           _consecutiveMatchCount = 1;
+          _confidenceHistory.clear();
+          _confidenceHistory.add(result.confidence);
         }
 
-        if (_consecutiveMatchCount < 2) {
+        // Weighted moving average across frames
+        double rollingConfidence = 0.0;
+        if (_confidenceHistory.length == 1) {
+          rollingConfidence = _confidenceHistory[0] * 0.70;
+        } else if (_confidenceHistory.length == 2) {
+          rollingConfidence = _confidenceHistory[1] * 0.60 + _confidenceHistory[0] * 0.40;
+        } else {
+          rollingConfidence = _confidenceHistory[2] * 0.50 + _confidenceHistory[1] * 0.30 + _confidenceHistory[0] * 0.20;
+        }
+
+        final pct = (rollingConfidence * 100).clamp(0, 100).toInt();
+
+        // Require at least 2 sustained frames with accumulated confidence >= 0.78
+        if (_consecutiveMatchCount < 2 || rollingConfidence < 0.78) {
           setState(() {
             _recognizedUser = user;
             _isLivenessPassed = false;
-            _livenessHint = 'Verifying identity...';
+            _livenessHint = 'Verifying identity ($pct%)...';
           });
           return;
         }
@@ -278,7 +296,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
         final punchStatus = await SupabaseSyncService().recordAttendanceLog(
           employeeName: user.name,
           employeeId: user.id,
-          confidence: result.confidence,
+          confidence: rollingConfidence,
         );
 
         if (mounted) {
@@ -299,6 +317,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
       } else {
         _consecutiveCandidateId = null;
         _consecutiveMatchCount = 0;
+        _confidenceHistory.clear();
         if (_recognizedUser != null) {
           setState(() {
             _recognizedUser = null;

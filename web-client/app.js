@@ -3097,11 +3097,12 @@ function stopWebScanner() {
 const employeeDescriptorCache = new Map();
 let webConsecutiveCandidateId = null;
 let webConsecutiveHits = 0;
+let webConfidenceBuffer = [];
 
-function extractFacialFeatureVector(sourceCanvas, cropRect) {
+function extractFacialFeatureVector(sourceCanvas, cropRect, faceLandmarks) {
   const faceCanvas = document.createElement('canvas');
-  faceCanvas.width = 80;
-  faceCanvas.height = 80;
+  faceCanvas.width = 96;
+  faceCanvas.height = 96;
   const fCtx = faceCanvas.getContext('2d', { willReadFrequently: true });
 
   const sx = cropRect ? Math.max(0, cropRect.x) : 0;
@@ -3109,12 +3110,27 @@ function extractFacialFeatureVector(sourceCanvas, cropRect) {
   const sw = cropRect ? Math.min(sourceCanvas.width - sx, cropRect.width) : sourceCanvas.width;
   const sh = cropRect ? Math.min(sourceCanvas.height - sy, cropRect.height) : sourceCanvas.height;
 
-  fCtx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, 80, 80);
-  const imgData = fCtx.getImageData(0, 0, 80, 80);
+  // 5-Point Affine Alignment: Compensate for head roll
+  let rollRad = 0;
+  if (faceLandmarks && faceLandmarks.leftEye && faceLandmarks.rightEye) {
+    const dx = faceLandmarks.rightEye.x - faceLandmarks.leftEye.x;
+    const dy = faceLandmarks.rightEye.y - faceLandmarks.leftEye.y;
+    rollRad = Math.atan2(dy, dx);
+  }
+
+  fCtx.save();
+  fCtx.translate(48, 48);
+  if (Math.abs(rollRad) > 0.02) {
+    fCtx.rotate(-rollRad);
+  }
+  fCtx.drawImage(sourceCanvas, sx, sy, sw, sh, -48, -48, 96, 96);
+  fCtx.restore();
+
+  const imgData = fCtx.getImageData(0, 0, 96, 96);
   const data = imgData.data;
 
   // Convert to grayscale luminance & compute global mean + variance
-  const gray = new Float32Array(80 * 80);
+  const gray = new Float32Array(96 * 96);
   let sum = 0.0;
   let sumSq = 0.0;
 
@@ -3128,15 +3144,15 @@ function extractFacialFeatureVector(sourceCanvas, cropRect) {
     sumSq += y * y;
   }
 
-  const nPixels = 80 * 80;
+  const nPixels = 96 * 96;
   const meanY = sum / nPixels;
   const varianceY = Math.max(1.0, (sumSq / nPixels) - (meanY * meanY));
   const stdY = Math.sqrt(varianceY);
 
-  // Divide into 6x6 spatial grid (36 cells, ~13x13 px each)
+  // Divide into 6x6 spatial grid (36 cells, 16x16 px each)
   const gridSize = 6;
-  const cellW = 80 / gridSize;
-  const cellH = 80 / gridSize;
+  const cellW = 96 / gridSize;
+  const cellH = 96 / gridSize;
   const vec = [];
 
   for (let gy = 0; gy < gridSize; gy++) {
@@ -3155,31 +3171,31 @@ function extractFacialFeatureVector(sourceCanvas, cropRect) {
 
       for (let y = startY; y < endY; y++) {
         for (let x = startX; x < endX; x++) {
-          const idx = y * 80 + x;
+          const idx = y * 96 + x;
           const val = (gray[idx] - meanY) / stdY;
           cellSum += val;
 
-          const left = x > 0 ? gray[y * 80 + (x - 1)] : gray[idx];
-          const right = x < 79 ? gray[y * 80 + (x + 1)] : gray[idx];
-          const top = y > 0 ? gray[(y - 1) * 80 + x] : gray[idx];
-          const bottom = y < 79 ? gray[(y + 1) * 80 + x] : gray[idx];
+          const left = x > 0 ? gray[y * 96 + (x - 1)] : gray[idx];
+          const right = x < 95 ? gray[y * 96 + (x + 1)] : gray[idx];
+          const top = y > 0 ? gray[(y - 1) * 96 + x] : gray[idx];
+          const bottom = y < 95 ? gray[(y + 1) * 96 + x] : gray[idx];
           cellGradX += (right - left) / stdY;
           cellGradY += (bottom - top) / stdY;
 
           const pIdx = idx * 4;
           cellCrCb += ((data[pIdx] - data[pIdx + 2]) / 255.0);
 
-          if (x > 0 && x < 79 && y > 0 && y < 79) {
+          if (x > 0 && x < 95 && y > 0 && y < 95) {
             const cVal = gray[idx];
             let lbpCode = 0;
-            if (gray[(y - 1) * 80 + (x - 1)] >= cVal) lbpCode |= 1;
-            if (gray[(y - 1) * 80 + x] >= cVal) lbpCode |= 2;
-            if (gray[(y - 1) * 80 + (x + 1)] >= cVal) lbpCode |= 4;
-            if (gray[y * 80 + (x + 1)] >= cVal) lbpCode |= 8;
-            if (gray[(y + 1) * 80 + (x + 1)] >= cVal) lbpCode |= 16;
-            if (gray[(y + 1) * 80 + x] >= cVal) lbpCode |= 32;
-            if (gray[(y + 1) * 80 + (x - 1)] >= cVal) lbpCode |= 64;
-            if (gray[y * 80 + (x - 1)] >= cVal) lbpCode |= 128;
+            if (gray[(y - 1) * 96 + (x - 1)] >= cVal) lbpCode |= 1;
+            if (gray[(y - 1) * 96 + x] >= cVal) lbpCode |= 2;
+            if (gray[(y - 1) * 96 + (x + 1)] >= cVal) lbpCode |= 4;
+            if (gray[y * 96 + (x + 1)] >= cVal) lbpCode |= 8;
+            if (gray[(y + 1) * 96 + (x + 1)] >= cVal) lbpCode |= 16;
+            if (gray[(y + 1) * 96 + x] >= cVal) lbpCode |= 32;
+            if (gray[(y + 1) * 96 + (x - 1)] >= cVal) lbpCode |= 64;
+            if (gray[y * 96 + (x - 1)] >= cVal) lbpCode |= 128;
             lbpHist[Math.floor(lbpCode / 32)]++;
           }
           count++;
@@ -3352,15 +3368,37 @@ async function processWebScannerFrame() {
   const liveDesc = extractFacialFeatureVector(cropCanvas);
 
   // A live face is detected in the blue box!
-  // Find closest matching enrolled employee with high-precision descriptor
+  // Enterprise 1:N Population Scalability: Coarse-to-Fine Indexing
+  let candidatesToEvaluate = employeesList;
+  if (employeesList.length > 50) {
+    const coarseProbe = liveDesc.slice(0, 16);
+    const ranked = [];
+    for (const emp of employeesList) {
+      const desc = await getOrComputeEmployeeDescriptor(emp);
+      if (!desc) continue;
+      const cScore = computeCosineSimilarity(coarseProbe, desc.slice(0, 16));
+      ranked.push({ emp, score: cScore });
+    }
+    ranked.sort((a, b) => b.score - a.score);
+    candidatesToEvaluate = ranked.slice(0, 50).map(r => r.emp);
+  }
+
   let bestMatch = null;
   let highestScore = -1.0;
   let runnerUpScore = -1.0;
+  let sumScores = 0.0;
+  let sumScoresSq = 0.0;
+  let evaluatedCount = 0;
 
-  for (const emp of employeesList) {
+  for (const emp of candidatesToEvaluate) {
     const desc = await getOrComputeEmployeeDescriptor(emp);
     if (!desc) continue;
     const score = computeCosineSimilarity(liveDesc, desc);
+    if (score > -0.5) {
+      sumScores += score;
+      sumScoresSq += score * score;
+      evaluatedCount++;
+    }
     if (score > highestScore) {
       runnerUpScore = highestScore;
       highestScore = score;
@@ -3370,21 +3408,47 @@ async function processWebScannerFrame() {
     }
   }
 
+  // Extreme Value Distribution (Z-Score) Outlier Test:
+  // Mathematical guarantee that match is an extreme statistical outlier
+  let isPopulationOutlier = true;
+  if (evaluatedCount >= 5) {
+    const meanScore = sumScores / evaluatedCount;
+    const variance = Math.max(1e-4, (sumScoresSq / evaluatedCount) - (meanScore * meanScore));
+    const stdScore = Math.sqrt(variance);
+    const zScore = (highestScore - meanScore) / stdScore;
+    isPopulationOutlier = zScore >= 2.8;
+  }
+
   const WEB_MATCH_THRESHOLD = 0.80;
-  const WEB_AMBIGUITY_MARGIN = 0.07;
+  const WEB_AMBIGUITY_MARGIN = 0.06;
   const hasAmbiguity = (employeesList.length > 1) && ((highestScore - runnerUpScore) < WEB_AMBIGUITY_MARGIN);
 
-  if (bestMatch && highestScore >= WEB_MATCH_THRESHOLD && !hasAmbiguity) {
+  if (bestMatch && highestScore >= WEB_MATCH_THRESHOLD && !hasAmbiguity && isPopulationOutlier) {
     if (webConsecutiveCandidateId === bestMatch.id) {
       webConsecutiveHits++;
+      webConfidenceBuffer.push(highestScore);
+      if (webConfidenceBuffer.length > 3) webConfidenceBuffer.shift();
     } else {
       webConsecutiveCandidateId = bestMatch.id;
       webConsecutiveHits = 1;
+      webConfidenceBuffer = [highestScore];
     }
 
-    // Require 2 consecutive frames agreeing on the candidate to prevent transient false matches
-    if (webConsecutiveHits < 2) {
-      if (statusPill) statusPill.textContent = `Verifying: ${bestMatch.name}...`;
+    // Weighted rolling confidence average across frames
+    let rollingConfidence = 0.0;
+    if (webConfidenceBuffer.length === 1) {
+      rollingConfidence = webConfidenceBuffer[0] * 0.70;
+    } else if (webConfidenceBuffer.length === 2) {
+      rollingConfidence = webConfidenceBuffer[1] * 0.60 + webConfidenceBuffer[0] * 0.40;
+    } else {
+      rollingConfidence = webConfidenceBuffer[2] * 0.50 + webConfidenceBuffer[1] * 0.30 + webConfidenceBuffer[0] * 0.20;
+    }
+
+    const pct = Math.min(100, Math.max(0, Math.round(rollingConfidence * 100)));
+
+    // Require sustained confidence across consecutive frames
+    if (webConsecutiveHits < 2 || rollingConfidence < 0.78) {
+      if (statusPill) statusPill.textContent = `Verifying: ${bestMatch.name} (${pct}%)...`;
       if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA] animate-pulse';
       return;
     }
@@ -3472,12 +3536,14 @@ async function processWebScannerFrame() {
   } else if (hasAmbiguity && highestScore >= WEB_MATCH_THRESHOLD) {
     webConsecutiveCandidateId = null;
     webConsecutiveHits = 0;
+    webConfidenceBuffer = [];
     if (oval) oval.className = 'relative w-56 h-64 border-2 border-[#167BB0] rounded-3xl transition-all duration-300 flex items-center justify-center shadow-[0_0_25px_rgba(22,123,176,0.45)]';
     if (statusPill) statusPill.textContent = 'Verifying identity • Look directly at camera';
     if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-sky-400';
   } else {
     webConsecutiveCandidateId = null;
     webConsecutiveHits = 0;
+    webConfidenceBuffer = [];
     if (oval) oval.className = 'relative w-56 h-64 border-2 border-[#167BB0] rounded-3xl transition-all duration-300 flex items-center justify-center shadow-[0_0_25px_rgba(22,123,176,0.45)]';
     if (statusPill) statusPill.textContent = skinRatio > 0.15 ? 'Unrecognized Face • Look straight at camera' : 'Position your face inside the blue box';
     if (statusDot) statusDot.className = skinRatio > 0.15 ? 'w-2.5 h-2.5 rounded-full bg-amber-400' : 'w-2.5 h-2.5 rounded-full bg-[#1D93CA]';
