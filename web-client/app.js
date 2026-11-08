@@ -19,6 +19,9 @@ let currentAuthUser = null;
 let attendanceLogs = [];
 let employeesList = [];
 let activeKiosksList = [];
+let employeeViewMode = 'table'; // 'table' | 'grid'
+let activeAttendanceModalEmp = null;
+let activeAttendanceModalLogs = [];
 
 // Multi-Step Sign-Up & Auth State
 let authMode = 'login'; // 'login' | 'signup'
@@ -124,6 +127,10 @@ window.clearEnrollPhoto = clearEnrollPhoto;
 window.startEnrollCamera = startEnrollCamera;
 window.stopEnrollCamera = stopEnrollCamera;
 window.captureEnrollPhoto = captureEnrollPhoto;
+window.setEmployeeViewMode = setEmployeeViewMode;
+window.openEmployeeAttendanceModal = openEmployeeAttendanceModal;
+window.closeEmployeeAttendanceModal = closeEmployeeAttendanceModal;
+window.filterModalAttendanceRecords = filterModalAttendanceRecords;
 
 // ==============================================================
 // Theme Toggle (Light / Dark Theme)
@@ -1982,47 +1989,390 @@ function renderSummaryView() {
   safeCreateIcons();
 }
 
-// Render Employees Directory Grid
-function renderEmployees(employees) {
-  const grid = document.getElementById('employees-grid');
-  if (!grid) return;
+// Helper: Currency Formatter
+function formatCurrency(amount) {
+  const num = Number(amount) || 0;
+  return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
 
-  if (!employees || employees.length === 0) {
-    grid.innerHTML = `
-      <div class="col-span-full py-16 text-center text-gray-500">
-        <i data-lucide="user-x" class="w-10 h-10 mx-auto mb-2 text-gray-400 dark:text-gray-600"></i>
-        <p class="text-sm">No employees registered yet.</p>
-        <p class="text-xs text-slate-400 dark:text-gray-600 mt-1">Enroll via Android Kiosk Camera or click "Enroll Employee".</p>
-      </div>
+// Toggle Employee Table vs Grid View
+function setEmployeeViewMode(mode) {
+  employeeViewMode = mode;
+  const tableContainer = document.getElementById('employees-table-container');
+  const gridContainer = document.getElementById('employees-grid');
+  const tableBtn = document.getElementById('emp-view-table-btn');
+  const gridBtn = document.getElementById('emp-view-grid-btn');
+
+  if (mode === 'table') {
+    if (tableContainer) tableContainer.classList.remove('hidden');
+    if (gridContainer) gridContainer.classList.add('hidden');
+    if (tableBtn) {
+      tableBtn.className = "p-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-[#151B28] text-[#167BB0] shadow-sm transition-all";
+    }
+    if (gridBtn) {
+      gridBtn.className = "p-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all";
+    }
+  } else {
+    if (tableContainer) tableContainer.classList.add('hidden');
+    if (gridContainer) gridContainer.classList.remove('hidden');
+    if (tableBtn) {
+      tableBtn.className = "p-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all";
+    }
+    if (gridBtn) {
+      gridBtn.className = "p-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-[#151B28] text-[#167BB0] shadow-sm transition-all";
+    }
+  }
+}
+
+// Render Professional Employee Management Table & Grid
+function renderEmployees(employees) {
+  const tableBody = document.getElementById('employees-table-body');
+  const grid = document.getElementById('employees-grid');
+  if (!tableBody && !grid) return;
+
+  const staffList = employees || [];
+
+  // Update Top KPIs
+  const totalStaff = staffList.length;
+  const totalPayroll = staffList.reduce((sum, e) => sum + (Number(e.salary) || 0), 0);
+  const avgSalary = totalStaff > 0 ? Math.round(totalPayroll / totalStaff) : 0;
+  const enrolledCount = staffList.filter(e => e.embeddings || e.photo_url).length;
+  const enrolledPct = totalStaff > 0 ? Math.round((enrolledCount / totalStaff) * 100) : 0;
+
+  const statTotalEl = document.getElementById('stat-emp-total');
+  const statPayrollEl = document.getElementById('stat-emp-payroll');
+  const statAvgSalaryEl = document.getElementById('stat-emp-avg-salary');
+  const statBiometricEl = document.getElementById('stat-emp-biometric');
+
+  if (statTotalEl) statTotalEl.textContent = totalStaff;
+  if (statPayrollEl) statPayrollEl.textContent = formatCurrency(totalPayroll);
+  if (statAvgSalaryEl) statAvgSalaryEl.textContent = formatCurrency(avgSalary);
+  if (statBiometricEl) statBiometricEl.textContent = `${enrolledPct}% (${enrolledCount}/${totalStaff})`;
+
+  // Update Department dropdown filter dynamically
+  const deptFilter = document.getElementById('filter-emp-dept');
+  if (deptFilter && (!deptFilter.children || deptFilter.children.length <= 1)) {
+    const currentVal = deptFilter.value;
+    const depts = Array.from(new Set(employeesList.map(e => (e.department || 'General').trim()).filter(Boolean))).sort();
+    deptFilter.innerHTML = '<option value="">All Departments</option>' + 
+      depts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+    deptFilter.value = currentVal;
+  }
+
+  // Pre-calculate punch counts per employee
+  const punchCountsByEmp = {};
+  if (Array.isArray(attendanceLogs)) {
+    for (const log of attendanceLogs) {
+      if (log.employee_id) {
+        punchCountsByEmp[log.employee_id] = (punchCountsByEmp[log.employee_id] || 0) + 1;
+      }
+      if (log.employee_name) {
+        const k = log.employee_name.trim().toLowerCase();
+        punchCountsByEmp[k] = (punchCountsByEmp[k] || 0) + 1;
+      }
+    }
+  }
+
+  // 1. Empty State
+  if (staffList.length === 0) {
+    const emptyRowHtml = `
+      <tr>
+        <td colspan="7" class="py-16 text-center text-slate-400 dark:text-gray-500">
+          <i data-lucide="users" class="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-gray-600"></i>
+          <p class="text-sm font-semibold text-slate-600 dark:text-gray-400">No staff members registered yet</p>
+          <p class="text-xs text-slate-400 mt-1">Click "+ Enroll Staff" to add employees with their salary & photo.</p>
+        </td>
+      </tr>
     `;
+    if (tableBody) tableBody.innerHTML = emptyRowHtml;
+    if (grid) {
+      grid.innerHTML = `
+        <div class="col-span-full py-16 text-center text-slate-400 dark:text-gray-500">
+          <i data-lucide="users" class="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-gray-600"></i>
+          <p class="text-sm font-semibold text-slate-600 dark:text-gray-400">No staff members registered yet</p>
+        </div>
+      `;
+    }
     safeCreateIcons();
     return;
   }
 
-  grid.innerHTML = employees.map(emp => {
-    return `
-      <div class="bg-white dark:bg-[#10151E] border border-gray-200 dark:border-brand-border rounded-2xl p-5 flex flex-col items-center text-center shadow-sm dark:shadow-lg relative group transition-colors">
-        <button onclick="handleDeleteEmployee('${emp.id}')" class="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors p-1" title="Delete Employee">
-          <i data-lucide="trash-2" class="w-4 h-4"></i>
-        </button>
-        <div class="w-16 h-16 rounded-full bg-cyan-500/10 border-2 border-cyan-400/40 flex items-center justify-center text-cyan-600 dark:text-cyan-300 font-bold text-lg mb-3 overflow-hidden shadow-inner">
-          ${emp.photo_url 
-            ? `<img src="${emp.photo_url}" class="w-full h-full object-cover">`
-            : emp.name.charAt(0)
-          }
-        </div>
-        <h4 class="font-bold text-slate-900 dark:text-white text-base">${escapeHtml(emp.name)}</h4>
-        <span class="text-xs text-cyan-600 dark:text-cyan-400/80 font-mono mt-0.5">${escapeHtml(emp.employee_code || 'EMP-' + emp.id.slice(0, 4))}</span>
-        ${emp.phone ? `<span class="text-xs text-slate-500 dark:text-gray-400 flex items-center justify-center gap-1 mt-1"><i data-lucide="phone" class="w-3 h-3 text-[#167BB0]"></i>${escapeHtml(emp.phone)}</span>` : ''}
-        <span class="mt-2 px-2.5 py-0.5 rounded-full text-[11px] bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/60">${escapeHtml(emp.department || 'General')}</span>
-        <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800/80 w-full flex items-center justify-between text-[11px] text-slate-500 dark:text-gray-500">
-          <span>Biometric: ${emp.embeddings ? 'Enrolled' : 'Active'}</span>
-          <span class="text-green-500 dark:text-green-400 font-semibold">Ready</span>
-        </div>
-      </div>
-    `;
-  }).join('');
+  // 2. Render Table Rows
+  if (tableBody) {
+    tableBody.innerHTML = staffList.map(emp => {
+      const empKey = (emp.name || '').trim().toLowerCase();
+      const punchesCount = punchCountsByEmp[emp.id] || punchCountsByEmp[empKey] || 0;
+      const salaryStr = formatCurrency(emp.salary || 0);
+      const isEnrolled = !!(emp.embeddings || emp.photo_url);
 
+      return `
+        <tr onclick="openEmployeeAttendanceModal('${emp.id}')" class="group hover:bg-sky-50/60 dark:hover:bg-slate-800/60 transition-colors cursor-pointer border-b border-slate-100 dark:border-slate-800/60">
+          <!-- Employee Photo & Name -->
+          <td class="py-3 px-4">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-xl bg-[#167BB0]/10 border border-[#167BB0]/20 flex items-center justify-center text-[#167BB0] font-bold text-sm overflow-hidden shrink-0 shadow-sm">
+                ${emp.photo_url 
+                  ? `<img src="${emp.photo_url}" class="w-full h-full object-cover">`
+                  : `<span class="uppercase">${escapeHtml(emp.name.charAt(0))}</span>`
+                }
+              </div>
+              <div class="min-w-0">
+                <p class="font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate group-hover:text-[#167BB0] dark:group-hover:text-sky-300 transition-colors">${escapeHtml(emp.name)}</p>
+                <p class="font-mono text-[11px] text-slate-400 dark:text-slate-500">${escapeHtml(emp.employee_code || 'EMP-' + emp.id.slice(0, 4))}</p>
+              </div>
+            </div>
+          </td>
+
+          <!-- Contact Phone -->
+          <td class="py-3 px-4">
+            ${emp.phone 
+              ? `<span class="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium"><i data-lucide="phone" class="w-3 h-3 text-[#167BB0] shrink-0"></i>${escapeHtml(emp.phone)}</span>`
+              : `<span class="text-xs text-slate-400">--</span>`
+            }
+          </td>
+
+          <!-- Department -->
+          <td class="py-3 px-4">
+            <span class="inline-block px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+              ${escapeHtml(emp.department || 'General')}
+            </span>
+          </td>
+
+          <!-- Monthly Salary -->
+          <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">
+            <span class="inline-flex items-center gap-1 text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 font-bold">
+              ${salaryStr}
+              <span class="text-[10px] font-normal text-slate-400">/mo</span>
+            </span>
+          </td>
+
+          <!-- Biometric Status -->
+          <td class="py-3 px-4">
+            ${isEnrolled
+              ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"><i data-lucide="check" class="w-3 h-3"></i> Enrolled</span>`
+              : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-300 border border-amber-200 dark:border-amber-800"><i data-lucide="clock" class="w-3 h-3"></i> Pending</span>`
+            }
+          </td>
+
+          <!-- Attendance Record CTA -->
+          <td class="py-3 px-4 text-center">
+            <button type="button" onclick="event.stopPropagation(); openEmployeeAttendanceModal('${emp.id}')" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#167BB0]/10 hover:bg-[#167BB0] text-[#167BB0] hover:text-white transition-all border border-[#167BB0]/30 shadow-xs cursor-pointer">
+              <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+              <span>${punchesCount} ${punchesCount === 1 ? 'Punch' : 'Punches'}</span>
+            </button>
+          </td>
+
+          <!-- Actions -->
+          <td class="py-3 px-4 text-right">
+            <button type="button" onclick="event.stopPropagation(); handleDeleteEmployee('${emp.id}')" class="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer" title="Delete Employee">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // 3. Render Grid Cards
+  if (grid) {
+    grid.innerHTML = staffList.map(emp => {
+      const empKey = (emp.name || '').trim().toLowerCase();
+      const punchesCount = punchCountsByEmp[emp.id] || punchCountsByEmp[empKey] || 0;
+      const salaryStr = formatCurrency(emp.salary || 0);
+
+      return `
+        <div onclick="openEmployeeAttendanceModal('${emp.id}')" class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col items-center text-center shadow-sm hover:shadow-md hover:border-[#167BB0]/40 transition-all cursor-pointer relative group">
+          <button onclick="event.stopPropagation(); handleDeleteEmployee('${emp.id}')" class="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition-colors p-1" title="Delete Employee">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+          <div class="w-16 h-16 rounded-2xl bg-[#167BB0]/10 border-2 border-[#167BB0]/20 flex items-center justify-center text-[#167BB0] font-bold text-lg mb-3 overflow-hidden shadow-sm">
+            ${emp.photo_url 
+              ? `<img src="${emp.photo_url}" class="w-full h-full object-cover">`
+              : `<span class="uppercase">${escapeHtml(emp.name.charAt(0))}</span>`
+            }
+          </div>
+          <h4 class="font-bold text-slate-900 dark:text-white text-base leading-tight">${escapeHtml(emp.name)}</h4>
+          <span class="text-xs text-[#167BB0] dark:text-sky-300 font-mono mt-0.5">${escapeHtml(emp.employee_code || 'EMP-' + emp.id.slice(0, 4))}</span>
+          ${emp.phone ? `<span class="text-xs text-slate-500 dark:text-gray-400 flex items-center justify-center gap-1 mt-1"><i data-lucide="phone" class="w-3 h-3 text-[#167BB0]"></i>${escapeHtml(emp.phone)}</span>` : ''}
+          
+          <div class="flex items-center gap-2 mt-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-gray-300 border border-slate-200 dark:border-slate-700">${escapeHtml(emp.department || 'General')}</span>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">${salaryStr}/mo</span>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 w-full flex items-center justify-between text-xs">
+            <span class="text-slate-400 font-medium">${punchesCount} Punches</span>
+            <span class="text-[#167BB0] dark:text-sky-300 font-bold flex items-center gap-1 group-hover:underline">
+              <span>View Attendance</span>
+              <i data-lucide="chevron-right" class="w-3 h-3"></i>
+            </span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  safeCreateIcons();
+}
+
+// Open Employee Date-Wise Attendance Modal
+function openEmployeeAttendanceModal(empId) {
+  const emp = employeesList.find(e => e.id === empId);
+  if (!emp) return;
+
+  activeAttendanceModalEmp = emp;
+
+  // Header Details
+  const avatarEl = document.getElementById('modal-emp-avatar');
+  const nameEl = document.getElementById('modal-emp-name');
+  const codeEl = document.getElementById('modal-emp-code');
+  const deptEl = document.getElementById('modal-emp-dept');
+  const phoneEl = document.getElementById('modal-emp-phone');
+  const salaryEl = document.getElementById('modal-emp-salary');
+  const searchInput = document.getElementById('modal-attendance-search');
+
+  if (avatarEl) {
+    avatarEl.innerHTML = emp.photo_url 
+      ? `<img src="${emp.photo_url}" class="w-full h-full object-cover">`
+      : `<span class="uppercase">${escapeHtml(emp.name.charAt(0))}</span>`;
+  }
+  if (nameEl) nameEl.textContent = emp.name;
+  if (codeEl) codeEl.textContent = emp.employee_code || 'EMP-' + emp.id.slice(0, 4);
+  if (deptEl) deptEl.innerHTML = `<i data-lucide="briefcase" class="w-3 h-3 text-slate-400"></i> ${escapeHtml(emp.department || 'General')}`;
+  if (phoneEl) phoneEl.innerHTML = `<i data-lucide="phone" class="w-3 h-3 text-slate-400"></i> ${escapeHtml(emp.phone || 'No phone')}`;
+  if (salaryEl) salaryEl.innerHTML = `<i data-lucide="circle-dollar-sign" class="w-3 h-3 text-emerald-500"></i> ${formatCurrency(emp.salary || 0)} / mo`;
+  if (searchInput) searchInput.value = '';
+
+  // Filter logs for this employee
+  const empKey = (emp.name || '').trim().toLowerCase();
+  const rawLogs = (attendanceLogs || []).filter(log => 
+    log.employee_id === emp.id || 
+    ((log.employee_name || '').trim().toLowerCase() === empKey)
+  );
+
+  // Group by date (formatLocalYMD)
+  const dateMap = new Map();
+  for (const log of rawLogs) {
+    const dStr = formatLocalYMD(new Date(log.created_at));
+    if (!dateMap.has(dStr)) {
+      dateMap.set(dStr, []);
+    }
+    dateMap.get(dStr).push(log);
+  }
+
+  // Convert to sorted date-wise array (newest date first)
+  const dateRecords = Array.from(dateMap.entries()).map(([dateStr, logs]) => {
+    logs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const firstPunch = logs[0];
+    const lastPunch = logs.length > 1 ? logs[logs.length - 1] : null;
+    const firstTimeObj = new Date(firstPunch.created_at);
+    const isLate = isPunchLate(firstTimeObj);
+
+    return {
+      dateStr,
+      displayDate: firstTimeObj.toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric', weekday: 'short' }),
+      firstIn: firstTimeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      lastOut: lastPunch ? new Date(lastPunch.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
+      isLate,
+      status: isLate ? 'Late' : 'On Time',
+      punchesCount: logs.length,
+      device: firstPunch.device_id || 'Terminal'
+    };
+  }).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+
+  activeAttendanceModalLogs = dateRecords;
+
+  // Update Modal Quick Metrics
+  const totalDays = dateRecords.length;
+  const onTimeDays = dateRecords.filter(r => !r.isLate).length;
+  const punctualityRate = totalDays > 0 ? Math.round((onTimeDays / totalDays) * 100) : 100;
+
+  const daysEl = document.getElementById('modal-metric-days');
+  const punchesEl = document.getElementById('modal-metric-punches');
+  const punctEl = document.getElementById('modal-metric-punctuality');
+
+  if (daysEl) daysEl.textContent = totalDays;
+  if (punchesEl) punchesEl.textContent = rawLogs.length;
+  if (punctEl) punctEl.textContent = `${punctualityRate}%`;
+
+  renderModalAttendanceRows(dateRecords);
+
+  const modal = document.getElementById('employee-attendance-modal');
+  if (modal) modal.classList.remove('hidden');
+  safeCreateIcons();
+}
+
+function closeEmployeeAttendanceModal() {
+  const modal = document.getElementById('employee-attendance-modal');
+  if (modal) modal.classList.add('hidden');
+  activeAttendanceModalEmp = null;
+  activeAttendanceModalLogs = [];
+}
+
+function filterModalAttendanceRecords() {
+  const query = (document.getElementById('modal-attendance-search')?.value || '').toLowerCase().trim();
+  if (!query) {
+    renderModalAttendanceRows(activeAttendanceModalLogs);
+    return;
+  }
+  const filtered = activeAttendanceModalLogs.filter(r => 
+    r.dateStr.toLowerCase().includes(query) || 
+    r.displayDate.toLowerCase().includes(query) || 
+    r.status.toLowerCase().includes(query) ||
+    r.device.toLowerCase().includes(query)
+  );
+  renderModalAttendanceRows(filtered);
+}
+
+function renderModalAttendanceRows(records) {
+  const tbody = document.getElementById('modal-attendance-rows');
+  const summaryEl = document.getElementById('modal-attendance-summary');
+  if (!tbody) return;
+
+  if (!records || records.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="py-12 text-center text-slate-400 dark:text-gray-500">
+          <i data-lucide="calendar-x" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-gray-600"></i>
+          <p class="text-xs font-semibold">No attendance records found for this employee.</p>
+        </td>
+      </tr>
+    `;
+    if (summaryEl) summaryEl.textContent = 'Showing 0 record(s)';
+    safeCreateIcons();
+    return;
+  }
+
+  tbody.innerHTML = records.map(r => `
+    <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+      <td class="py-2.5 px-3.5 font-semibold text-slate-900 dark:text-white">
+        ${escapeHtml(r.displayDate)}
+      </td>
+      <td class="py-2.5 px-3 text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
+        ${escapeHtml(r.firstIn)}
+      </td>
+      <td class="py-2.5 px-3 text-slate-600 dark:text-slate-300 font-mono">
+        ${escapeHtml(r.lastOut)}
+      </td>
+      <td class="py-2.5 px-3">
+        <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+          r.isLate 
+            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+        }">
+          ${escapeHtml(r.status)}
+        </span>
+      </td>
+      <td class="py-2.5 px-3 text-slate-500 text-[11px] truncate max-w-[120px]" title="${escapeHtml(r.device)}">
+        ${escapeHtml(r.device)}
+      </td>
+      <td class="py-2.5 px-3.5 text-right font-bold text-slate-700 dark:text-slate-300">
+        ${r.punchesCount}
+      </td>
+    </tr>
+  `).join('');
+
+  if (summaryEl) summaryEl.textContent = `Showing ${records.length} date record(s)`;
   safeCreateIcons();
 }
 
@@ -2622,15 +2972,23 @@ function filterAttendanceLogs() {
   renderLiveFeedAttendance(filtered);
 }
 
-// Filter Employees
+// Filter Employees by Search Query and Department
 function filterEmployees() {
-  const query = (document.getElementById('search-employees').value || '').toLowerCase();
-  const filtered = employeesList.filter(emp => 
-    (emp.name || '').toLowerCase().includes(query) || 
-    (emp.employee_code || '').toLowerCase().includes(query) ||
-    (emp.department || '').toLowerCase().includes(query) ||
-    (emp.phone || '').toLowerCase().includes(query)
-  );
+  const query = (document.getElementById('search-employees')?.value || '').toLowerCase().trim();
+  const deptFilter = (document.getElementById('filter-emp-dept')?.value || '').toLowerCase().trim();
+
+  const filtered = employeesList.filter(emp => {
+    const matchesQuery = !query || 
+      (emp.name || '').toLowerCase().includes(query) || 
+      (emp.employee_code || '').toLowerCase().includes(query) ||
+      (emp.department || '').toLowerCase().includes(query) ||
+      (emp.phone || '').toLowerCase().includes(query);
+
+    const matchesDept = !deptFilter || (emp.department || '').toLowerCase().trim() === deptFilter;
+
+    return matchesQuery && matchesDept;
+  });
+
   renderEmployees(filtered);
 }
 
@@ -2903,6 +3261,8 @@ function openAddEmployeeModal() {
   if (codeInput) codeInput.value = '';
   const deptInput = document.getElementById('new-emp-dept');
   if (deptInput) deptInput.value = '';
+  const salaryInput = document.getElementById('new-emp-salary');
+  if (salaryInput) salaryInput.value = '';
 
   const fileInput = document.getElementById('enroll-file-input');
   if (fileInput) fileInput.value = '';
@@ -2935,6 +3295,8 @@ async function handleCreateEmployee(e) {
   const phone = (document.getElementById('new-emp-phone')?.value || '').trim();
   const code = document.getElementById('new-emp-code').value.trim();
   const dept = document.getElementById('new-emp-dept').value.trim();
+  const salaryVal = parseFloat(document.getElementById('new-emp-salary')?.value || '0');
+  const salary = isNaN(salaryVal) ? 0 : salaryVal;
 
   if (!supabaseClient) {
     alert('Please configure Supabase API credentials first.');
@@ -2946,6 +3308,7 @@ async function handleCreateEmployee(e) {
       name,
       employee_code: code || null,
       department: dept || 'General',
+      salary: salary,
       photo_url: capturedEnrollPhoto || null,
       embeddings: capturedEnrollEmbedding || null,
       is_active: true,
@@ -2963,7 +3326,9 @@ async function handleCreateEmployee(e) {
       .select();
 
     if (error) {
-      // Fallback: If phone or user_id column does not exist in schema, retry without them
+      console.warn('Initial employee insert notice (checking schema columns):', error.message);
+      // Fallback: If salary, phone or user_id column does not exist in schema, retry without them
+      if (newRecord.salary !== undefined) delete newRecord.salary;
       if (newRecord.phone) delete newRecord.phone;
       if (newRecord.user_id) delete newRecord.user_id;
       const fallbackRes = await supabaseClient
@@ -2980,6 +3345,8 @@ async function handleCreateEmployee(e) {
     if (phoneInput) phoneInput.value = '';
     document.getElementById('new-emp-code').value = '';
     document.getElementById('new-emp-dept').value = '';
+    const salaryInput = document.getElementById('new-emp-salary');
+    if (salaryInput) salaryInput.value = '';
     
     // Refresh employee directory immediately
     await fetchEmployees();
