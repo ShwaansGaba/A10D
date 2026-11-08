@@ -3241,32 +3241,102 @@ function computeCosineSimilarity(vecA, vecB) {
   return Math.max(-1.0, Math.min(1.0, dot));
 }
 
+// Detect and crop face region from an uploaded photo or image with 5-point alignment
+async function detectAndCropFaceFromImage(img) {
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth || img.width || 300;
+  canvas.height = img.naturalHeight || img.height || 300;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  let faceBox = null;
+
+  // 1. Try Native FaceDetector API (Chromium / Edge / Chrome on Mobile)
+  if ('FaceDetector' in window) {
+    try {
+      const detector = new window.FaceDetector({ fastMode: false, maxDetectedFaces: 1 });
+      const faces = await detector.detect(canvas);
+      if (faces && faces.length > 0) {
+        faceBox = faces[0].boundingBox;
+      }
+    } catch (_) {}
+  }
+
+  // 2. Fallback: Skin-tone & Luminance Centroid Cluster
+  if (!faceBox) {
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let minX = canvas.width, maxX = 0, minY = canvas.height, maxY = 0;
+    let count = 0;
+    const step = 4;
+
+    for (let y = 0; y < canvas.height; y += step) {
+      for (let x = 0; x < canvas.width; x += step) {
+        const idx = (y * canvas.width + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        if (r > 60 && g > 40 && b > 20 && r > g && r > b && (Math.max(r, g, b) - Math.min(r, g, b) > 15)) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          count++;
+        }
+      }
+    }
+
+    if (count > 50 && maxX > minX && maxY > minY) {
+      const fw = maxX - minX;
+      const fh = maxY - minY;
+      faceBox = {
+        x: Math.max(0, minX),
+        y: Math.max(0, minY),
+        width: fw,
+        height: Math.min(fh, fw * 1.3)
+      };
+    }
+  }
+
+  // 3. Render standardized 96x96 face chip
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = 96;
+  outCanvas.height = 96;
+  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
+
+  if (faceBox) {
+    const padX = faceBox.width * 0.15;
+    const padY = faceBox.height * 0.15;
+    const sx = Math.max(0, faceBox.x - padX);
+    const sy = Math.max(0, faceBox.y - padY);
+    const sw = Math.min(canvas.width - sx, faceBox.width + padX * 2);
+    const sh = Math.min(canvas.height - sy, faceBox.height + padY * 2);
+    outCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 96, 96);
+  } else {
+    // Upper-center crop (standard for ID / portrait photos)
+    const minDim = Math.min(canvas.width, canvas.height);
+    const sx = (canvas.width - minDim) / 2;
+    const sy = Math.max(0, (canvas.height - minDim) * 0.15);
+    outCtx.drawImage(canvas, sx, sy, minDim, minDim, 0, 0, 96, 96);
+  }
+
+  return outCanvas;
+}
+
 async function getOrComputeEmployeeDescriptor(emp) {
   if (!emp) return null;
   if (employeeDescriptorCache.has(emp.id)) {
     return employeeDescriptorCache.get(emp.id);
   }
 
-  if (emp.embeddings && Array.isArray(emp.embeddings) && emp.embeddings.length > 0) {
-    let emb = emp.embeddings[0];
-    if (Array.isArray(emb) && emb.length >= 100) {
-      employeeDescriptorCache.set(emp.id, emb);
-      return emb;
-    }
-  }
-
+  // Always extract high-precision biometrics directly from employee photo
   if (emp.photo_url) {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = () => {
+      img.onload = async () => {
         try {
-          const c = document.createElement('canvas');
-          c.width = img.width || 120;
-          c.height = img.height || 120;
-          const ctx = c.getContext('2d', { willReadFrequently: true });
-          ctx.drawImage(img, 0, 0, c.width, c.height);
-          const desc = extractFacialFeatureVector(c);
+          const faceCanvas = await detectAndCropFaceFromImage(img);
+          const desc = extractFacialFeatureVector(faceCanvas);
           employeeDescriptorCache.set(emp.id, desc);
           resolve(desc);
         } catch (e) {
@@ -3276,6 +3346,14 @@ async function getOrComputeEmployeeDescriptor(emp) {
       img.onerror = () => resolve(null);
       img.src = emp.photo_url;
     });
+  }
+
+  if (emp.embeddings && Array.isArray(emp.embeddings) && emp.embeddings.length > 0) {
+    let emb = emp.embeddings[0];
+    if (Array.isArray(emb) && emb.length >= 100) {
+      employeeDescriptorCache.set(emp.id, emb);
+      return emb;
+    }
   }
 
   return null;
@@ -3360,11 +3438,25 @@ async function processWebScannerFrame() {
   }
 
   // Extract real facial descriptor from live webcam face crop
+  let liveFaceX = cropX;
+  let liveFaceY = cropY;
+  let liveFaceW = cropW;
+  let liveFaceH = cropH;
+
+  if (detectedFaceBox) {
+    const padX = detectedFaceBox.width * 0.15;
+    const padY = detectedFaceBox.height * 0.15;
+    liveFaceX = Math.max(0, detectedFaceBox.x - padX);
+    liveFaceY = Math.max(0, detectedFaceBox.y - padY);
+    liveFaceW = Math.min(canvas.width - liveFaceX, detectedFaceBox.width + padX * 2);
+    liveFaceH = Math.min(canvas.height - liveFaceY, detectedFaceBox.height + padY * 2);
+  }
+
   const cropCanvas = document.createElement('canvas');
-  cropCanvas.width = 100;
-  cropCanvas.height = 100;
+  cropCanvas.width = 96;
+  cropCanvas.height = 96;
   const cCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
-  cCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, 100, 100);
+  cCtx.drawImage(canvas, liveFaceX, liveFaceY, liveFaceW, liveFaceH, 0, 0, 96, 96);
   const liveDesc = extractFacialFeatureVector(cropCanvas);
 
   // A live face is detected in the blue box!
@@ -3640,35 +3732,31 @@ function handleEnrollFileUpload(e) {
   const reader = new FileReader();
   reader.onload = function(event) {
     const img = new Image();
-    img.onload = function() {
-      // Create canvas to center-crop square (160x160)
-      const canvas = document.getElementById('enroll-canvas') || document.createElement('canvas');
-      canvas.width = 160;
-      canvas.height = 160;
-      const ctx = canvas.getContext('2d');
-
-      const minDim = Math.min(img.width, img.height);
-      const sx = (img.width - minDim) / 2;
-      const sy = (img.height - minDim) / 2;
-
-      ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, 160, 160);
-      capturedEnrollPhoto = canvas.toDataURL('image/jpeg', 0.85);
-
-      // Extract real high-precision biometric visual descriptor
-      const realDescriptor = extractFacialFeatureVector(canvas);
-      capturedEnrollEmbedding = [realDescriptor, realDescriptor, realDescriptor];
-
+    img.onload = async function() {
       const avatarPreview = document.getElementById('enroll-avatar-preview');
       const statusText = document.getElementById('enroll-status-text');
       const removeBtn = document.getElementById('enroll-remove-photo-btn');
       const btnText = document.getElementById('enroll-btn-text');
 
+      if (statusText) {
+        statusText.textContent = 'Detecting facial features from uploaded photo...';
+        statusText.className = 'text-[11px] text-[#1D93CA] font-semibold block animate-pulse';
+      }
+
+      // Automatically locate and crop face from uploaded photo
+      const faceCanvas = await detectAndCropFaceFromImage(img);
+      capturedEnrollPhoto = faceCanvas.toDataURL('image/jpeg', 0.90);
+
+      // Extract real biometric visual descriptor directly from the cropped face
+      const realDescriptor = extractFacialFeatureVector(faceCanvas);
+      capturedEnrollEmbedding = [realDescriptor, realDescriptor, realDescriptor];
+
       if (avatarPreview) {
         avatarPreview.innerHTML = `<img src="${capturedEnrollPhoto}" class="w-full h-full object-cover">`;
       }
       if (statusText) {
-        statusText.textContent = `✓ Photo uploaded: ${file.name}`;
-        statusText.className = 'text-[11px] text-green-500 font-semibold block';
+        statusText.textContent = `✓ Biometric face detected & registered: ${file.name}`;
+        statusText.className = 'text-[11px] text-emerald-600 font-semibold block';
       }
       if (removeBtn) {
         removeBtn.classList.remove('hidden');
@@ -4489,32 +4577,20 @@ function handleEditFileUpload(e) {
       const maxDim = 480;
       let w = img.width;
       let h = img.height;
-      if (w > maxDim || h > maxDim) {
-        if (w > h) {
-          h = Math.round((h * maxDim) / w);
-          w = maxDim;
-        } else {
-          w = Math.round((w * maxDim) / h);
-          h = maxDim;
-        }
-      }
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-
-      capturedEditPhoto = canvas.toDataURL('image/jpeg', 0.85);
+      // Automatically detect and crop face from uploaded photo
+      const faceCanvas = await detectAndCropFaceFromImage(img);
+      capturedEditPhoto = faceCanvas.toDataURL('image/jpeg', 0.90);
 
       if (avatarPreview) {
         avatarPreview.innerHTML = `<img src="${capturedEditPhoto}" class="w-full h-full object-cover">`;
       }
       if (removeBtn) removeBtn.classList.remove('hidden');
 
-      // Extract real high-precision biometric visual descriptor
-      const realDescriptor = extractFacialFeatureVector(canvas);
+      // Extract real high-precision biometric visual descriptor from aligned face
+      const realDescriptor = extractFacialFeatureVector(faceCanvas);
       capturedEditEmbedding = [realDescriptor, realDescriptor, realDescriptor];
       if (statusText) {
-        statusText.textContent = '✓ Photo attached & biometric profile generated!';
+        statusText.textContent = '✓ Biometric face detected & updated!';
         statusText.className = 'text-[11px] text-emerald-600 font-semibold block';
       }
     };

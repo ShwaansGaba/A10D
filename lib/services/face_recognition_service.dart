@@ -209,58 +209,45 @@ class FaceRecognitionService {
       return;
     }
 
-    final remoteNames = remoteEmployees
-        .map((e) => (e['name'] as String?)?.trim().toLowerCase())
-        .whereType<String>()
-        .toSet();
-    final remoteIds = remoteEmployees
-        .map((e) => e['id']?.toString())
-        .whereType<String>()
-        .toSet();
-
-    // 2. Filter localUsers: ONLY KEEP users that still exist on Supabase!
-    // If a user was deleted on the web or another terminal, REMOVE them from this device immediately!
+    // 2. Filter & reconcile localUsers with Supabase
+    // Clean up users that no longer exist on server, and update users whose biometric
+    // data needs to be populated or refreshed from photo.
     final updatedList = <RegisteredUser>[];
-    for (final user in localUsers) {
-      final matchesName = remoteNames.contains(user.name.trim().toLowerCase());
-      final matchesId = remoteIds.contains(user.id);
+    final processedIds = <String>{};
 
-      if (matchesName || matchesId) {
-        updatedList.add(user);
-      } else {
-        debugPrint('Employee ${user.name} was removed on server. Deleting from local face cache...');
-        if (user.photoPath.isNotEmpty) {
-          try {
-            final f = File(user.photoPath);
-            if (f.existsSync()) f.deleteSync();
-          } catch (_) {}
+    for (final emp in remoteEmployees) {
+      final name = (emp['name'] as String?)?.trim();
+      if (name == null || name.isEmpty) continue;
+      final empId = emp['id']?.toString() ?? '';
+      if (empId.isEmpty) continue;
+      processedIds.add(empId);
+
+      // Check if this employee already has a local entry
+      final localIndex = localUsers.indexWhere(
+        (u) => u.id == empId || u.name.trim().toLowerCase() == name.toLowerCase(),
+      );
+      final existingLocal = localIndex != -1 ? localUsers[localIndex] : null;
+
+      List<List<double>> parsedEmbeddings = [];
+      if (existingLocal != null && existingLocal.embeddings.isNotEmpty) {
+        // Keep valid 192-D embeddings if already extracted
+        final validEmbeddings = existingLocal.embeddings
+            .where((emb) => emb.length == 192)
+            .toList();
+        if (validEmbeddings.isNotEmpty) {
+          parsedEmbeddings = validEmbeddings;
         }
       }
-    }
 
-    // 3. Import any remote employees that have photo or embeddings and are not yet in local cache
-    for (final emp in remoteEmployees) {
-      final name = emp['name'] as String?;
-      if (name == null || name.trim().isEmpty) continue;
-      final empId = emp['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
-      final hasLocal = updatedList.any((u) => u.name.trim().toLowerCase() == name.trim().toLowerCase());
+      String localPhotoPath = existingLocal?.photoPath ?? '';
 
-      if (!hasLocal) {
-        List<List<double>> parsedEmbeddings = [];
-        try {
-          final rawEmbeddings = emp['embeddings'];
-          if (rawEmbeddings is List) {
-            for (final item in rawEmbeddings) {
-              if (item is List) {
-                parsedEmbeddings.add(item.map((e) => (e as num).toDouble()).toList());
-              }
-            }
-          }
-        } catch (_) {}
+      // If embeddings are missing/mismatched or photo file doesn't exist, download photo & re-extract
+      final bool needsBiometricExtraction = parsedEmbeddings.isEmpty;
+      final bool needsPhotoDownload = localPhotoPath.isEmpty || !File(localPhotoPath).existsSync();
 
-        String localPhotoPath = '';
-        final photoUrl = emp['photo_url'] as String?;
-        if (photoUrl != null && photoUrl.startsWith('data:image')) {
+      final photoUrl = emp['photo_url'] as String?;
+      if ((needsBiometricExtraction || needsPhotoDownload) && photoUrl != null && photoUrl.isNotEmpty) {
+        if (photoUrl.startsWith('data:image')) {
           try {
             final commaIdx = photoUrl.indexOf(',');
             if (commaIdx != -1) {
@@ -272,56 +259,76 @@ class FaceRecognitionService {
               await file.writeAsBytes(bytes);
               localPhotoPath = file.path;
             }
-          } catch (_) {}
-        } else if (photoUrl != null && photoUrl.isNotEmpty) {
-          if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
-            try {
-              final client = HttpClient();
-              final request = await client.getUrl(Uri.parse(photoUrl));
-              final response = await request.close();
-              if (response.statusCode == 200) {
-                final bytes = await consolidateHttpClientResponseBytes(response);
-                final appDir = await getApplicationDocumentsDirectory();
-                final fileName = 'cloud_face_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                final file = File(p.join(appDir.path, fileName));
-                await file.writeAsBytes(bytes);
-                localPhotoPath = file.path;
-              }
-            } catch (e) {
-              debugPrint('Notice downloading remote face photo for ${name.trim()}: $e');
-            }
-          } else {
-            localPhotoPath = photoUrl;
+          } catch (e) {
+            debugPrint('Error decoding base64 photo for $name: $e');
           }
-        }
-
-        // BIOMETRIC RESOLUTION: If photo is available, extract the exact ML Kit geometric vector!
-        // This ensures employees enrolled on the web client or uploaded via photo are seamlessly
-        // scanned and recognized by the mobile camera!
-        if (localPhotoPath.isNotEmpty && File(localPhotoPath).existsSync()) {
+        } else if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
           try {
-            final extraction = await extractFaceEmbedding(localPhotoPath);
-            if (extraction != null && extraction.embedding.isNotEmpty) {
-              parsedEmbeddings = [extraction.embedding];
-              debugPrint('Biometric vector computed from photo for employee: ${name.trim()}');
+            final client = HttpClient();
+            final request = await client.getUrl(Uri.parse(photoUrl));
+            final response = await request.close();
+            if (response.statusCode == 200) {
+              final bytes = await consolidateHttpClientResponseBytes(response);
+              final appDir = await getApplicationDocumentsDirectory();
+              final fileName = 'cloud_face_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+              final file = File(p.join(appDir.path, fileName));
+              await file.writeAsBytes(bytes);
+              localPhotoPath = file.path;
             }
           } catch (e) {
-            debugPrint('ML Kit photo feature extraction notice for ${name.trim()}: $e');
+            debugPrint('Notice downloading remote face photo for $name: $e');
           }
         }
+      }
 
-        if (parsedEmbeddings.isNotEmpty || localPhotoPath.isNotEmpty) {
-          final newUser = RegisteredUser(
-            id: empId,
-            name: name.trim(),
-            phone: emp['phone'] as String?,
-            photoPath: localPhotoPath,
-            registeredAt: emp['created_at'] != null ? DateTime.tryParse(emp['created_at']) ?? DateTime.now() : DateTime.now(),
-            embeddings: parsedEmbeddings,
-          );
-          updatedList.add(newUser);
-          debugPrint('Synced employee from remote into local face database: ${newUser.name} (Embeddings: ${parsedEmbeddings.length})');
+      // If we have a local photo and need 192-D biometric vector, extract it via Google ML Kit
+      if (parsedEmbeddings.isEmpty && localPhotoPath.isNotEmpty && File(localPhotoPath).existsSync()) {
+        try {
+          final extraction = await extractFaceEmbedding(localPhotoPath);
+          if (extraction != null && extraction.embedding.isNotEmpty) {
+            parsedEmbeddings = [extraction.embedding];
+            debugPrint('Biometric 192-D ML Kit vector computed from photo for employee: $name');
+          }
+        } catch (e) {
+          debugPrint('ML Kit photo feature extraction notice for $name: $e');
         }
+      }
+
+      // Check if remote DB already provides native embeddings
+      if (parsedEmbeddings.isEmpty) {
+        try {
+          final rawEmbeddings = emp['embeddings'];
+          if (rawEmbeddings is List) {
+            for (final item in rawEmbeddings) {
+              if (item is List && item.length == 192) {
+                parsedEmbeddings.add(item.map((e) => (e as num).toDouble()).toList());
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      final resolvedUser = RegisteredUser(
+        id: empId,
+        name: name,
+        phone: emp['phone'] as String? ?? existingLocal?.phone,
+        photoPath: localPhotoPath,
+        registeredAt: emp['created_at'] != null
+            ? DateTime.tryParse(emp['created_at']) ?? DateTime.now()
+            : (existingLocal?.registeredAt ?? DateTime.now()),
+        embeddings: parsedEmbeddings,
+      );
+      updatedList.add(resolvedUser);
+      debugPrint('Employee reconciled: ${resolvedUser.name} (Embeddings: ${parsedEmbeddings.length}, Photo: ${localPhotoPath.isNotEmpty})');
+    }
+
+    // Clean up orphaned photo files of deleted employees
+    for (final oldUser in localUsers) {
+      if (!processedIds.contains(oldUser.id) && oldUser.photoPath.isNotEmpty) {
+        try {
+          final f = File(oldUser.photoPath);
+          if (f.existsSync()) f.deleteSync();
+        } catch (_) {}
       }
     }
 
@@ -839,10 +846,11 @@ class FaceRecognitionService {
   }
 
   double _calculateCosineSimilarity(List<double> vecA, List<double> vecB) {
-    final len = math.min(vecA.length, vecB.length);
-    if (len == 0) return 0.0;
+    if (vecA.isEmpty || vecB.isEmpty) return 0.0;
+    // Dimension check: vectors must come from the same feature space (192-D)
+    if (vecA.length != vecB.length) return 0.0;
     double dotProduct = 0.0;
-    for (int i = 0; i < len; i++) {
+    for (int i = 0; i < vecA.length; i++) {
       dotProduct += vecA[i] * vecB[i];
     }
     return dotProduct.clamp(-1.0, 1.0);
