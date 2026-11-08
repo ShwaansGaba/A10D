@@ -262,7 +262,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
         // Weighted moving average across frames
         double rollingConfidence = 0.0;
         if (_confidenceHistory.length == 1) {
-          rollingConfidence = _confidenceHistory[0] * 0.70;
+          rollingConfidence = _confidenceHistory[0];
         } else if (_confidenceHistory.length == 2) {
           rollingConfidence = _confidenceHistory[1] * 0.60 + _confidenceHistory[0] * 0.40;
         } else {
@@ -271,8 +271,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
         final pct = (rollingConfidence * 100).clamp(0, 100).toInt();
 
-        // Require at least 2 sustained frames with accumulated confidence >= 0.78
-        if (_consecutiveMatchCount < 2 || rollingConfidence < 0.78) {
+        // Require at least 2 sustained frames with accumulated confidence >= 0.65
+        if (_consecutiveMatchCount < 2 || rollingConfidence < 0.65) {
           setState(() {
             _recognizedUser = user;
             _isLivenessPassed = false;

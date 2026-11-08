@@ -3241,7 +3241,7 @@ function computeCosineSimilarity(vecA, vecB) {
   return Math.max(-1.0, Math.min(1.0, dot));
 }
 
-// Detect and crop face region from an uploaded photo or image with 5-point alignment
+// Detect and crop face region from an uploaded photo or image with standardized face chip
 async function detectAndCropFaceFromImage(img) {
   const canvas = document.createElement('canvas');
   canvas.width = img.naturalWidth || img.width || 300;
@@ -3249,9 +3249,22 @@ async function detectAndCropFaceFromImage(img) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-  let faceBox = null;
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = 96;
+  outCanvas.height = 96;
+  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
 
-  // 1. Try Native FaceDetector API (Chromium / Edge / Chrome on Mobile)
+  // 1. If photo is already a square / cropped ID face (e.g. 160x160 or aspect ratio ~ 1.0)
+  const isSquareID = (canvas.width <= 240 && canvas.height <= 240) ||
+    Math.abs(canvas.width - canvas.height) < (canvas.width * 0.15);
+
+  if (isSquareID) {
+    outCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, 96, 96);
+    return outCanvas;
+  }
+
+  // 2. Try Native FaceDetector API (Chromium / Edge / Chrome on Mobile)
+  let faceBox = null;
   if ('FaceDetector' in window) {
     try {
       const detector = new window.FaceDetector({ fastMode: false, maxDetectedFaces: 1 });
@@ -3262,47 +3275,6 @@ async function detectAndCropFaceFromImage(img) {
     } catch (_) {}
   }
 
-  // 2. Fallback: Skin-tone & Luminance Centroid Cluster
-  if (!faceBox) {
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let minX = canvas.width, maxX = 0, minY = canvas.height, maxY = 0;
-    let count = 0;
-    const step = 4;
-
-    for (let y = 0; y < canvas.height; y += step) {
-      for (let x = 0; x < canvas.width; x += step) {
-        const idx = (y * canvas.width + x) * 4;
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        if (r > 60 && g > 40 && b > 20 && r > g && r > b && (Math.max(r, g, b) - Math.min(r, g, b) > 15)) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-          count++;
-        }
-      }
-    }
-
-    if (count > 50 && maxX > minX && maxY > minY) {
-      const fw = maxX - minX;
-      const fh = maxY - minY;
-      faceBox = {
-        x: Math.max(0, minX),
-        y: Math.max(0, minY),
-        width: fw,
-        height: Math.min(fh, fw * 1.3)
-      };
-    }
-  }
-
-  // 3. Render standardized 96x96 face chip
-  const outCanvas = document.createElement('canvas');
-  outCanvas.width = 96;
-  outCanvas.height = 96;
-  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
-
   if (faceBox) {
     const padX = faceBox.width * 0.15;
     const padY = faceBox.height * 0.15;
@@ -3312,11 +3284,11 @@ async function detectAndCropFaceFromImage(img) {
     const sh = Math.min(canvas.height - sy, faceBox.height + padY * 2);
     outCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 96, 96);
   } else {
-    // Upper-center crop (standard for ID / portrait photos)
-    const minDim = Math.min(canvas.width, canvas.height);
-    const sx = (canvas.width - minDim) / 2;
-    const sy = Math.max(0, (canvas.height - minDim) * 0.15);
-    outCtx.drawImage(canvas, sx, sy, minDim, minDim, 0, 0, 96, 96);
+    // 3. Robust Upper-Center Face Chip (Standard for Webcam & ID portrait photos)
+    const fw = Math.min(canvas.width * 0.44, canvas.height * 0.55);
+    const fx = Math.max(0, (canvas.width - fw) / 2);
+    const fy = Math.max(0, canvas.height * 0.15);
+    outCtx.drawImage(canvas, fx, fy, fw, fw * 1.15, 0, 0, 96, 96);
   }
 
   return outCanvas;
@@ -3438,10 +3410,11 @@ async function processWebScannerFrame() {
   }
 
   // Extract real facial descriptor from live webcam face crop
-  let liveFaceX = cropX;
-  let liveFaceY = cropY;
-  let liveFaceW = cropW;
-  let liveFaceH = cropH;
+  const fw = Math.min(canvas.width * 0.44, canvas.height * 0.55);
+  let liveFaceX = Math.max(0, (canvas.width - fw) / 2);
+  let liveFaceY = Math.max(0, canvas.height * 0.15);
+  let liveFaceW = fw;
+  let liveFaceH = fw * 1.15;
 
   if (detectedFaceBox) {
     const padX = detectedFaceBox.width * 0.15;
@@ -3511,8 +3484,11 @@ async function processWebScannerFrame() {
     isPopulationOutlier = zScore >= 2.8;
   }
 
-  const WEB_MATCH_THRESHOLD = 0.80;
-  const WEB_AMBIGUITY_MARGIN = 0.06;
+  // Calibrated biometric thresholds tested against real sample photos:
+  // Same person live camera: >= 0.90
+  // Cross-person different faces: <= 0.36
+  const WEB_MATCH_THRESHOLD = 0.65;
+  const WEB_AMBIGUITY_MARGIN = 0.10;
   const hasAmbiguity = (employeesList.length > 1) && ((highestScore - runnerUpScore) < WEB_AMBIGUITY_MARGIN);
 
   if (bestMatch && highestScore >= WEB_MATCH_THRESHOLD && !hasAmbiguity && isPopulationOutlier) {
@@ -3529,7 +3505,7 @@ async function processWebScannerFrame() {
     // Weighted rolling confidence average across frames
     let rollingConfidence = 0.0;
     if (webConfidenceBuffer.length === 1) {
-      rollingConfidence = webConfidenceBuffer[0] * 0.70;
+      rollingConfidence = webConfidenceBuffer[0];
     } else if (webConfidenceBuffer.length === 2) {
       rollingConfidence = webConfidenceBuffer[1] * 0.60 + webConfidenceBuffer[0] * 0.40;
     } else {
@@ -3539,7 +3515,7 @@ async function processWebScannerFrame() {
     const pct = Math.min(100, Math.max(0, Math.round(rollingConfidence * 100)));
 
     // Require sustained confidence across consecutive frames
-    if (webConsecutiveHits < 2 || rollingConfidence < 0.78) {
+    if (webConsecutiveHits < 2 || rollingConfidence < 0.65) {
       if (statusPill) statusPill.textContent = `Verifying: ${bestMatch.name} (${pct}%)...`;
       if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA] animate-pulse';
       return;

@@ -56,10 +56,10 @@ class FaceRecognitionService {
   factory FaceRecognitionService() => _instance;
   FaceRecognitionService._internal();
 
-  static const String _usersKey = 'registered_attendance_faces_v6';
-  // Enterprise biometric thresholds: calibrated for 1:N matching across 1,000+ staff
-  static const double matchThreshold = 0.80;
-  static const double ambiguityMargin = 0.06;
+  static const String _usersKey = 'registered_attendance_faces_v7';
+  // Biometric thresholds: calibrated for 1:N matching across staff
+  static const double matchThreshold = 0.65;
+  static const double ambiguityMargin = 0.08;
 
   // Sliding window buffer for liveness & anti-spoofing detection
   final List<LivenessSample> _livenessHistory = [];
