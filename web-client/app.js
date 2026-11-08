@@ -54,13 +54,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Set default summary and live feed date pickers to today
   const todayYmd = new Date().toISOString().slice(0, 10);
+  const currentYm = new Date().toISOString().slice(0, 7);
   const summaryPicker = document.getElementById('summary-date-picker');
   if (summaryPicker) {
     summaryPicker.value = todayYmd;
   }
+  const summaryMonthPicker = document.getElementById('summary-month-picker');
+  if (summaryMonthPicker) {
+    summaryMonthPicker.value = currentYm;
+  }
   const liveFeedPicker = document.getElementById('live-feed-date-picker');
   if (liveFeedPicker) {
     liveFeedPicker.value = todayYmd;
+  }
+  const modalMonthPicker = document.getElementById('modal-attendance-month');
+  if (modalMonthPicker) {
+    modalMonthPicker.value = currentYm;
   }
 
   initOtpBoxHandlers();
@@ -131,6 +140,24 @@ window.setEmployeeViewMode = setEmployeeViewMode;
 window.openEmployeeAttendanceModal = openEmployeeAttendanceModal;
 window.closeEmployeeAttendanceModal = closeEmployeeAttendanceModal;
 window.filterModalAttendanceRecords = filterModalAttendanceRecords;
+window.setModalViewMode = setModalViewMode;
+window.stepModalMonth = stepModalMonth;
+window.setModalMonthFilter = setModalMonthFilter;
+window.handleModalMonthChange = handleModalMonthChange;
+window.setSummaryViewMode = setSummaryViewMode;
+window.stepSummaryMonth = stepSummaryMonth;
+window.openEditEmployeeModal = openEditEmployeeModal;
+window.closeEditEmployeeModal = closeEditEmployeeModal;
+window.handleEditFileUpload = handleEditFileUpload;
+window.clearEditEnrollPhoto = clearEditEnrollPhoto;
+window.startEditEnrollCamera = startEditEnrollCamera;
+window.stopEditEnrollCamera = stopEditEnrollCamera;
+window.captureEditEnrollPhoto = captureEditEnrollPhoto;
+window.handleUpdateEmployee = handleUpdateEmployee;
+window.openEditAttendanceModal = openEditAttendanceModal;
+window.closeEditAttendanceModal = closeEditAttendanceModal;
+window.setEditPunchQuickPunctuality = setEditPunchQuickPunctuality;
+window.handleUpdateAttendance = handleUpdateAttendance;
 
 // ==============================================================
 // Theme Toggle (Light / Dark Theme)
@@ -1738,11 +1765,32 @@ async function fetchAttendanceLogs() {
   }
 }
 
+// Local cache for punctuality manual overrides
+let punctualityOverrides = {};
+try {
+  punctualityOverrides = JSON.parse(localStorage.getItem('a10d_punctuality_overrides') || '{}');
+} catch (_) {}
+
 // Helper: Check if a punch time is late (after 09:30 AM local time)
 function isPunchLate(dateObj) {
   const hours = dateObj.getHours();
   const minutes = dateObj.getMinutes();
   return (hours > 9 || (hours === 9 && minutes > 30));
+}
+
+// Master Helper: Get Punctuality status taking overrides and database values into account
+function getPunchPunctuality(log) {
+  if (log && log.id && punctualityOverrides[log.id]) {
+    return punctualityOverrides[log.id];
+  }
+  if (log && log.punctuality && log.punctuality !== 'Auto') {
+    return log.punctuality;
+  }
+  if (log && log.created_at) {
+    const dateObj = new Date(log.created_at);
+    return isPunchLate(dateObj) ? 'Late' : 'On Time';
+  }
+  return 'On Time';
 }
 
 // Helper: Check if employee already punched in today
@@ -1787,12 +1835,34 @@ function buildAttendanceRowsHtml(logs, emptyTitle, emptySubtitle) {
     const dateObj = new Date(log.created_at);
     const timeFormatted = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const dateFormatted = dateObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-    const late = isPunchLate(dateObj);
+    const punctuality = getPunchPunctuality(log);
+
+    let punctualityBadge;
+    if (punctuality === 'Late') {
+      punctualityBadge = `
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+          <i data-lucide="alert-circle" class="w-3 h-3 mr-1"></i>Late Arrival
+        </span>`;
+    } else if (punctuality === 'On Time') {
+      punctualityBadge = `
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+          <i data-lucide="check" class="w-3 h-3 mr-1"></i>On Time
+        </span>`;
+    } else {
+      punctualityBadge = `
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30">
+          <i data-lucide="info" class="w-3 h-3 mr-1"></i>${escapeHtml(punctuality)}
+        </span>`;
+    }
+
+    const punchTypeBadge = log.punch_type === 'OUT'
+      ? `<span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Checked Out</span>`
+      : `<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">Checked In</span>`;
 
     return `
       <tr class="hover:bg-slate-50 dark:hover:bg-[#161E2A] transition-colors">
         <td class="py-3.5 px-4 flex items-center space-x-3">
-          <div class="w-9 h-9 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-300 font-bold text-xs uppercase overflow-hidden">
+          <div class="w-9 h-9 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-300 font-bold text-xs uppercase overflow-hidden shrink-0">
             ${log.photo_url 
               ? `<img src="${log.photo_url}" class="w-full h-full object-cover">`
               : (log.employee_name || 'U').charAt(0)
@@ -1800,35 +1870,31 @@ function buildAttendanceRowsHtml(logs, emptyTitle, emptySubtitle) {
           </div>
           <div>
             <div class="font-semibold text-slate-900 dark:text-white text-sm">${escapeHtml(log.employee_name || 'Unknown')}</div>
-            <div class="text-[11px] text-slate-500 dark:text-gray-500">${log.employee_id ? '#' + log.employee_id.slice(0, 8) : 'Biometric ID'}</div>
+            <div class="text-[11px] text-slate-500 dark:text-gray-500 font-mono">${log.employee_id ? '#' + log.employee_id.slice(0, 8) : 'Biometric ID'}</div>
           </div>
         </td>
         <td class="py-3.5 px-4">
-          <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-            Checked In
-          </span>
+          ${punchTypeBadge}
         </td>
         <td class="py-3.5 px-4">
-          <div class="text-slate-900 dark:text-white font-medium text-xs">${timeFormatted}</div>
+          <div class="text-slate-900 dark:text-white font-medium text-xs font-mono">${timeFormatted}</div>
           <div class="text-[11px] text-slate-500 dark:text-gray-500">${dateFormatted}</div>
         </td>
         <td class="py-3.5 px-4">
-          ${late 
-            ? `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                <i data-lucide="alert-circle" class="w-3 h-3 mr-1"></i>Late Arrival
-               </span>`
-            : `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                <i data-lucide="check" class="w-3 h-3 mr-1"></i>On Time
-               </span>`
-          }
+          ${punctualityBadge}
         </td>
         <td class="py-3.5 px-4 text-xs text-slate-600 dark:text-gray-400">
           <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-gray-800 text-[11px] text-slate-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/60">${escapeHtml(log.device_id || 'Kiosk-1')}</span>
         </td>
         <td class="py-3.5 px-4 text-right">
-          <button onclick="handleDeletePunch('${log.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-red-500/10 transition-all" title="Remove Punch Record">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
+          <div class="flex items-center justify-end space-x-1">
+            <button onclick="openEditAttendanceModal('${log.id}')" class="text-slate-400 hover:text-[#167BB0] p-1.5 rounded-lg hover:bg-[#167BB0]/10 transition-all cursor-pointer" title="Edit Punch Details & Punctuality">
+              <i data-lucide="pencil" class="w-4 h-4"></i>
+            </button>
+            <button onclick="handleDeletePunch('${log.id}')" class="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-all cursor-pointer" title="Remove Punch Record">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
         </td>
       </tr>
     `;
@@ -1880,11 +1946,230 @@ function renderAttendanceLogs(logs) {
   filterAttendanceLogs();
 }
 
+let summaryViewMode = 'monthly'; // 'monthly' | 'daily'
+
+function setSummaryViewMode(mode) {
+  summaryViewMode = mode;
+  const monthBtn = document.getElementById('summary-view-month-btn');
+  const dailyBtn = document.getElementById('summary-view-daily-btn');
+  const monthCtrl = document.getElementById('summary-month-control');
+  const dateCtrl = document.getElementById('summary-date-control');
+  const kpisWrap = document.getElementById('summary-month-kpis');
+
+  if (mode === 'monthly') {
+    if (monthBtn) monthBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-[#151B28] text-[#167BB0] shadow-sm transition-all cursor-pointer";
+    if (dailyBtn) dailyBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer";
+    if (monthCtrl) monthCtrl.classList.remove('hidden');
+    if (dateCtrl) {
+      dateCtrl.classList.add('hidden');
+      dateCtrl.classList.remove('flex');
+    }
+    if (kpisWrap) kpisWrap.classList.remove('hidden');
+  } else {
+    if (monthBtn) monthBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer";
+    if (dailyBtn) dailyBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-[#151B28] text-[#167BB0] shadow-sm transition-all cursor-pointer";
+    if (monthCtrl) monthCtrl.classList.add('hidden');
+    if (dateCtrl) {
+      dateCtrl.classList.remove('hidden');
+      dateCtrl.classList.add('flex');
+    }
+    if (kpisWrap) kpisWrap.classList.add('hidden');
+  }
+  renderSummaryView();
+}
+
+function stepSummaryMonth(delta) {
+  const picker = document.getElementById('summary-month-picker');
+  const currentVal = picker && picker.value ? picker.value : new Date().toISOString().slice(0, 7);
+  const [y, m] = currentVal.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  const nextYm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  if (picker) picker.value = nextYm;
+  renderSummaryView();
+}
+
 // Render Daily & Monthly Attendance Summary View
 function renderSummaryView() {
+  const thead = document.getElementById('summary-table-head');
   const tbody = document.getElementById('summary-table-body');
   if (!tbody) return;
 
+  if (summaryViewMode === 'monthly') {
+    renderMonthlyMasterSummary(thead, tbody);
+  } else {
+    renderDailyLogSummary(thead, tbody);
+  }
+}
+
+// Master Monthly Attendance Summary Table & KPIs
+function renderMonthlyMasterSummary(thead, tbody) {
+  const monthPicker = document.getElementById('summary-month-picker');
+  const selectedYm = monthPicker && monthPicker.value 
+    ? monthPicker.value 
+    : new Date().toISOString().slice(0, 7);
+
+  const [selYear, selMonthNum] = selectedYm.split('-').map(Number);
+  const selMonthIndex = selMonthNum - 1;
+  const monthDateObj = new Date(selYear, selMonthIndex, 1);
+  const monthNameStr = monthDateObj.toLocaleDateString([], { month: 'short', year: 'numeric' });
+  const daysInMonth = new Date(selYear, selMonthIndex + 1, 0).getDate();
+
+  // Set Table Header for Monthly View
+  if (thead) {
+    thead.innerHTML = `
+      <tr>
+        <th class="py-3 px-4 font-semibold">Employee</th>
+        <th class="py-3 px-4 font-semibold">Department</th>
+        <th class="py-3 px-4 font-semibold">Monthly Base Salary</th>
+        <th class="py-3 px-4 font-semibold text-center">Days Present</th>
+        <th class="py-3 px-4 font-semibold text-center">On Time</th>
+        <th class="py-3 px-4 font-semibold text-center">Late</th>
+        <th class="py-3 px-4 font-semibold text-center">Attendance %</th>
+        <th class="py-3 px-4 font-semibold">Est. Payout</th>
+        <th class="py-3 px-4 font-semibold text-right">Actions</th>
+      </tr>
+    `;
+  }
+
+  if (!employeesList || employeesList.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" class="py-12 text-center text-gray-500">
+          <i data-lucide="users" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-gray-600"></i>
+          <p class="text-xs font-semibold">No employees enrolled in directory yet.</p>
+        </td>
+      </tr>
+    `;
+    safeCreateIcons();
+    return;
+  }
+
+  let totalMonthPresentDaysAll = 0;
+  let totalMonthPunchesAll = 0;
+  let totalEstimatedPayroll = 0;
+
+  const rowsHtml = employeesList.map(emp => {
+    const empKey = (emp.name || '').trim().toLowerCase();
+    
+    // Filter this employee's logs in this month
+    const empMonthLogs = (attendanceLogs || []).filter(log => {
+      const d = new Date(log.created_at);
+      const isMonth = d.getFullYear() === selYear && d.getMonth() === selMonthIndex;
+      const isEmp = log.employee_id === emp.id || ((log.employee_name || '').trim().toLowerCase() === empKey);
+      return isMonth && isEmp;
+    });
+
+    totalMonthPunchesAll += empMonthLogs.length;
+
+    // Group punches by local YMD date
+    const dateMap = {};
+    empMonthLogs.forEach(log => {
+      const dStr = formatLocalYMD(new Date(log.created_at));
+      if (!dateMap[dStr]) dateMap[dStr] = [];
+      dateMap[dStr].push(log);
+    });
+
+    const presentDays = Object.keys(dateMap).length;
+    totalMonthPresentDaysAll += presentDays;
+
+    let onTimeDays = 0;
+    let lateDays = 0;
+
+    Object.values(dateMap).forEach(dayLogs => {
+      dayLogs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const firstPunch = dayLogs[0];
+      const punc = getPunchPunctuality(firstPunch);
+      if (punc === 'Late') {
+        lateDays++;
+      } else {
+        onTimeDays++;
+      }
+    });
+
+    // Attendance percentage based on days elapsed or total days in month
+    const now = new Date();
+    const isCurrentMonth = (now.getFullYear() === selYear && now.getMonth() === selMonthIndex);
+    const benchmarkDays = isCurrentMonth ? Math.max(1, now.getDate()) : daysInMonth;
+    const attRate = Math.min(100, Math.round((presentDays / benchmarkDays) * 100));
+
+    // Pro-rated estimated payout
+    const salary = Number(emp.salary) || 0;
+    const estPayout = salary > 0 ? Math.round((presentDays / daysInMonth) * salary) : 0;
+    totalEstimatedPayroll += (estPayout > 0 ? estPayout : salary);
+
+    return `
+      <tr class="hover:bg-slate-50 dark:hover:bg-[#161E2A] transition-colors">
+        <td class="py-3 px-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-[#167BB0]/10 border border-[#167BB0]/20 flex items-center justify-center text-[#167BB0] font-bold text-xs uppercase overflow-hidden shrink-0">
+              ${emp.photo_url ? `<img src="${emp.photo_url}" class="w-full h-full object-cover">` : escapeHtml(emp.name.charAt(0))}
+            </div>
+            <div>
+              <div class="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">${escapeHtml(emp.name)}</div>
+              <div class="text-[11px] text-slate-400 font-mono">${escapeHtml(emp.employee_code || 'EMP-' + emp.id.slice(0, 4))}</div>
+            </div>
+          </div>
+        </td>
+        <td class="py-3 px-4 text-xs font-medium text-slate-600 dark:text-slate-300">
+          <span class="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] border border-slate-200 dark:border-slate-700">${escapeHtml(emp.department || 'General')}</span>
+        </td>
+        <td class="py-3 px-4 text-xs font-semibold text-slate-900 dark:text-white">
+          ${formatCurrency(salary)}<span class="text-[10px] text-slate-400 font-normal">/mo</span>
+        </td>
+        <td class="py-3 px-4 text-center">
+          <span class="inline-flex items-center justify-center font-bold text-sm text-[#167BB0] dark:text-sky-300 font-mono">${presentDays}</span>
+          <span class="text-[11px] text-slate-400">/${daysInMonth}d</span>
+        </td>
+        <td class="py-3 px-4 text-center">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">${onTimeDays}</span>
+        </td>
+        <td class="py-3 px-4 text-center">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${lateDays > 0 ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800' : 'text-slate-400'}">${lateDays}</span>
+        </td>
+        <td class="py-3 px-4 text-center">
+          <div class="flex items-center justify-center space-x-1.5">
+            <div class="w-12 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-full bg-emerald-500 rounded-full" style="width: ${attRate}%;"></div>
+            </div>
+            <span class="text-xs font-bold text-slate-800 dark:text-slate-200">${attRate}%</span>
+          </div>
+        </td>
+        <td class="py-3 px-4 font-bold text-xs text-emerald-600 dark:text-emerald-400">
+          ${formatCurrency(estPayout > 0 ? estPayout : (presentDays > 0 ? salary : 0))}
+        </td>
+        <td class="py-3 px-4 text-right">
+          <div class="flex items-center justify-end space-x-1">
+            <button onclick="openEmployeeAttendanceModal('${emp.id}')" class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#167BB0]/10 hover:bg-[#167BB0] text-[#167BB0] hover:text-white transition-all border border-[#167BB0]/30 shadow-xs cursor-pointer flex items-center space-x-1" title="Inspect Employee Attendance Sheet">
+              <i data-lucide="calendar" class="w-3 h-3"></i>
+              <span>Sheet</span>
+            </button>
+            <button onclick="openEditEmployeeModal('${emp.id}')" class="p-1 rounded-lg text-slate-400 hover:text-[#167BB0] hover:bg-[#167BB0]/10 transition-all cursor-pointer" title="Edit Employee">
+              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.innerHTML = rowsHtml;
+
+  // Update Monthly Summary KPI Cards
+  const kpiMonthEl = document.getElementById('stat-sum-month');
+  const kpiDaysEl = document.getElementById('stat-sum-present-days');
+  const kpiPunchesEl = document.getElementById('stat-sum-punches');
+  const kpiPayrollEl = document.getElementById('stat-sum-payroll');
+
+  if (kpiMonthEl) kpiMonthEl.textContent = monthNameStr;
+  if (kpiDaysEl) kpiDaysEl.textContent = totalMonthPresentDaysAll;
+  if (kpiPunchesEl) kpiPunchesEl.textContent = totalMonthPunchesAll;
+  if (kpiPayrollEl) kpiPayrollEl.textContent = formatCurrency(totalEstimatedPayroll);
+
+  safeCreateIcons();
+}
+
+// Daily Log Summary View
+function renderDailyLogSummary(thead, tbody) {
   const summaryPicker = document.getElementById('summary-date-picker');
   const selectedDateStr = summaryPicker && summaryPicker.value 
     ? summaryPicker.value 
@@ -1894,10 +2179,24 @@ function renderSummaryView() {
   const selectedMonth = selectedDate.getMonth();
   const selectedYear = selectedDate.getFullYear();
 
+  if (thead) {
+    thead.innerHTML = `
+      <tr>
+        <th class="py-3 px-4 font-semibold">Employee</th>
+        <th class="py-3 px-4 font-semibold">Department</th>
+        <th class="py-3 px-4 font-semibold">Punch Time</th>
+        <th class="py-3 px-4 font-semibold">Status</th>
+        <th class="py-3 px-4 font-semibold">Punctuality</th>
+        <th class="py-3 px-4 font-semibold text-center">Monthly Total</th>
+        <th class="py-3 px-4 font-semibold text-right">Actions</th>
+      </tr>
+    `;
+  }
+
   if (!employeesList || employeesList.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="py-12 text-center text-gray-500">
+        <td colspan="7" class="py-12 text-center text-gray-500">
           No employees found in directory.
         </td>
       </tr>
@@ -1937,9 +2236,9 @@ function renderSummaryView() {
     if (isPresent) {
       const punchDateObj = new Date(datePunch.created_at);
       timeStr = punchDateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const isLate = isPunchLate(punchDateObj);
+      const punctuality = getPunchPunctuality(datePunch);
 
-      punctualityBadge = isLate
+      punctualityBadge = punctuality === 'Late'
         ? `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">Late</span>`
         : `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">On Time</span>`;
     }
@@ -1976,11 +2275,22 @@ function renderSummaryView() {
         <td class="py-3.5 px-4">
           ${punctualityBadge}
         </td>
-        <td class="py-3.5 px-4">
-          <div class="flex items-center space-x-2">
+        <td class="py-3.5 px-4 text-center">
+          <div class="flex items-center justify-center space-x-1.5">
             <span class="font-bold text-cyan-600 dark:text-cyan-400 text-sm font-mono">${monthlyDays}</span>
             <span class="text-xs text-slate-500 dark:text-gray-500">days</span>
           </div>
+        </td>
+        <td class="py-3.5 px-4 text-right">
+          ${datePunch ? `
+            <button onclick="openEditAttendanceModal('${datePunch.id}')" class="p-1 rounded text-slate-400 hover:text-[#167BB0] hover:bg-[#167BB0]/10 transition-all cursor-pointer" title="Edit Punch">
+              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+            </button>
+          ` : `
+            <button onclick="openManualPunchModal()" class="px-2 py-1 rounded text-[11px] font-semibold text-[#167BB0] hover:bg-[#167BB0]/10 transition-all cursor-pointer" title="Log Manual Punch">
+              + Punch
+            </button>
+          `}
         </td>
       </tr>
     `;
@@ -2164,9 +2474,14 @@ function renderEmployees(employees) {
 
           <!-- Actions -->
           <td class="py-3 px-4 text-right">
-            <button type="button" onclick="event.stopPropagation(); handleDeleteEmployee('${emp.id}')" class="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer" title="Delete Employee">
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
+            <div class="flex items-center justify-end space-x-1">
+              <button type="button" onclick="event.stopPropagation(); openEditEmployeeModal('${emp.id}')" class="p-1.5 rounded-xl text-slate-400 hover:text-[#167BB0] hover:bg-[#167BB0]/10 transition-all cursor-pointer" title="Edit Staff Details & Salary">
+                <i data-lucide="pencil" class="w-4 h-4"></i>
+              </button>
+              <button type="button" onclick="event.stopPropagation(); handleDeleteEmployee('${emp.id}')" class="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer" title="Delete Employee">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
           </td>
         </tr>
       `;
@@ -2182,9 +2497,14 @@ function renderEmployees(employees) {
 
       return `
         <div onclick="openEmployeeAttendanceModal('${emp.id}')" class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col items-center text-center shadow-sm hover:shadow-md hover:border-[#167BB0]/40 transition-all cursor-pointer relative group">
-          <button onclick="event.stopPropagation(); handleDeleteEmployee('${emp.id}')" class="absolute top-3 right-3 text-slate-400 hover:text-rose-500 transition-colors p-1" title="Delete Employee">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
+          <div class="absolute top-3 right-3 flex items-center space-x-1">
+            <button onclick="event.stopPropagation(); openEditEmployeeModal('${emp.id}')" class="text-slate-400 hover:text-[#167BB0] transition-colors p-1" title="Edit Employee">
+              <i data-lucide="pencil" class="w-4 h-4"></i>
+            </button>
+            <button onclick="event.stopPropagation(); handleDeleteEmployee('${emp.id}')" class="text-slate-400 hover:text-rose-500 transition-colors p-1" title="Delete Employee">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
           <div class="w-16 h-16 rounded-2xl bg-[#167BB0]/10 border-2 border-[#167BB0]/20 flex items-center justify-center text-[#167BB0] font-bold text-lg mb-3 overflow-hidden shadow-sm">
             ${emp.photo_url 
               ? `<img src="${emp.photo_url}" class="w-full h-full object-cover">`
@@ -2215,7 +2535,72 @@ function renderEmployees(employees) {
   safeCreateIcons();
 }
 
-// Open Employee Date-Wise Attendance Modal
+// Modal State for Employee Attendance
+let modalViewMode = 'daily'; // 'daily' | 'monthly'
+let modalSelectedMonth = ''; // 'YYYY-MM' or '' for all
+
+function setModalViewMode(mode) {
+  modalViewMode = mode;
+  const tabDaily = document.getElementById('modal-tab-daily');
+  const tabMonthly = document.getElementById('modal-tab-monthly');
+  const dailyContainer = document.getElementById('modal-daily-table-container');
+  const monthlyContainer = document.getElementById('modal-monthly-table-container');
+  const monthWrap = document.getElementById('modal-month-filter-wrap');
+  const allBtn = document.getElementById('modal-month-all-btn');
+  const searchInput = document.getElementById('modal-attendance-search');
+
+  if (mode === 'daily') {
+    if (tabDaily) tabDaily.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-[#151B28] text-[#167BB0] shadow-sm transition-all cursor-pointer";
+    if (tabMonthly) tabMonthly.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer";
+    if (dailyContainer) dailyContainer.classList.remove('hidden');
+    if (monthlyContainer) monthlyContainer.classList.add('hidden');
+    if (monthWrap) monthWrap.classList.remove('hidden');
+    if (allBtn) allBtn.classList.remove('hidden');
+    if (searchInput) searchInput.classList.remove('hidden');
+  } else {
+    if (tabDaily) tabDaily.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer";
+    if (tabMonthly) tabMonthly.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-[#151B28] text-[#167BB0] shadow-sm transition-all cursor-pointer";
+    if (dailyContainer) dailyContainer.classList.add('hidden');
+    if (monthlyContainer) monthlyContainer.classList.remove('hidden');
+    if (monthWrap) monthWrap.classList.add('hidden');
+    if (allBtn) allBtn.classList.add('hidden');
+    if (searchInput) searchInput.classList.add('hidden');
+    renderModalMonthlyRows();
+  }
+}
+
+function setModalMonthFilter(val) {
+  const monthInput = document.getElementById('modal-attendance-month');
+  const allBtn = document.getElementById('modal-month-all-btn');
+  if (val === 'all') {
+    modalSelectedMonth = '';
+    if (monthInput) monthInput.value = '';
+    if (allBtn) allBtn.className = "px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#167BB0] text-white shadow-xs transition-all cursor-pointer";
+  } else {
+    modalSelectedMonth = val;
+    if (monthInput) monthInput.value = val;
+    if (allBtn) allBtn.className = "px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer";
+  }
+  filterModalAttendanceRecords();
+}
+
+function stepModalMonth(delta) {
+  const monthInput = document.getElementById('modal-attendance-month');
+  const currentVal = (monthInput && monthInput.value) || new Date().toISOString().slice(0, 7);
+  const [y, m] = currentVal.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  const nextYm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  setModalMonthFilter(nextYm);
+}
+
+function handleModalMonthChange() {
+  const monthInput = document.getElementById('modal-attendance-month');
+  if (monthInput && monthInput.value) {
+    setModalMonthFilter(monthInput.value);
+  }
+}
+
+// Open Employee Date-Wise & Month-Wise Attendance Modal
 function openEmployeeAttendanceModal(empId) {
   const emp = employeesList.find(e => e.id === empId);
   if (!emp) return;
@@ -2230,6 +2615,7 @@ function openEmployeeAttendanceModal(empId) {
   const phoneEl = document.getElementById('modal-emp-phone');
   const salaryEl = document.getElementById('modal-emp-salary');
   const searchInput = document.getElementById('modal-attendance-search');
+  const monthInput = document.getElementById('modal-attendance-month');
 
   if (avatarEl) {
     avatarEl.innerHTML = emp.photo_url 
@@ -2242,6 +2628,14 @@ function openEmployeeAttendanceModal(empId) {
   if (phoneEl) phoneEl.innerHTML = `<i data-lucide="phone" class="w-3 h-3 text-slate-400"></i> ${escapeHtml(emp.phone || 'No phone')}`;
   if (salaryEl) salaryEl.innerHTML = `<i data-lucide="circle-dollar-sign" class="w-3 h-3 text-emerald-500"></i> ${formatCurrency(emp.salary || 0)} / mo`;
   if (searchInput) searchInput.value = '';
+
+  // Default to current month
+  const currentYm = new Date().toISOString().slice(0, 7);
+  modalSelectedMonth = currentYm;
+  if (monthInput) monthInput.value = currentYm;
+
+  // Set default view to daily logs
+  setModalViewMode('daily');
 
   // Filter logs for this employee
   const empKey = (emp.name || '').trim().toLowerCase();
@@ -2266,15 +2660,17 @@ function openEmployeeAttendanceModal(empId) {
     const firstPunch = logs[0];
     const lastPunch = logs.length > 1 ? logs[logs.length - 1] : null;
     const firstTimeObj = new Date(firstPunch.created_at);
-    const isLate = isPunchLate(firstTimeObj);
+    const punctuality = getPunchPunctuality(firstPunch);
+    const isLate = punctuality === 'Late';
 
     return {
+      punchId: firstPunch.id,
       dateStr,
       displayDate: firstTimeObj.toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric', weekday: 'short' }),
       firstIn: firstTimeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       lastOut: lastPunch ? new Date(lastPunch.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
       isLate,
-      status: isLate ? 'Late' : 'On Time',
+      status: punctuality,
       punchesCount: logs.length,
       device: firstPunch.device_id || 'Terminal'
     };
@@ -2282,20 +2678,8 @@ function openEmployeeAttendanceModal(empId) {
 
   activeAttendanceModalLogs = dateRecords;
 
-  // Update Modal Quick Metrics
-  const totalDays = dateRecords.length;
-  const onTimeDays = dateRecords.filter(r => !r.isLate).length;
-  const punctualityRate = totalDays > 0 ? Math.round((onTimeDays / totalDays) * 100) : 100;
-
-  const daysEl = document.getElementById('modal-metric-days');
-  const punchesEl = document.getElementById('modal-metric-punches');
-  const punctEl = document.getElementById('modal-metric-punctuality');
-
-  if (daysEl) daysEl.textContent = totalDays;
-  if (punchesEl) punchesEl.textContent = rawLogs.length;
-  if (punctEl) punctEl.textContent = `${punctualityRate}%`;
-
-  renderModalAttendanceRows(dateRecords);
+  // Filter records by initial month
+  filterModalAttendanceRecords();
 
   const modal = document.getElementById('employee-attendance-modal');
   if (modal) modal.classList.remove('hidden');
@@ -2311,17 +2695,69 @@ function closeEmployeeAttendanceModal() {
 
 function filterModalAttendanceRecords() {
   const query = (document.getElementById('modal-attendance-search')?.value || '').toLowerCase().trim();
-  if (!query) {
-    renderModalAttendanceRows(activeAttendanceModalLogs);
-    return;
+  const allBtn = document.getElementById('modal-month-all-btn');
+
+  let records = activeAttendanceModalLogs || [];
+
+  // Filter by selected Month (e.g. '2026-11') if not 'all'
+  if (modalSelectedMonth) {
+    records = records.filter(r => r.dateStr.startsWith(modalSelectedMonth));
+    if (allBtn) allBtn.className = "px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer";
+  } else {
+    if (allBtn) allBtn.className = "px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#167BB0] text-white shadow-xs transition-all cursor-pointer";
   }
-  const filtered = activeAttendanceModalLogs.filter(r => 
-    r.dateStr.toLowerCase().includes(query) || 
-    r.displayDate.toLowerCase().includes(query) || 
-    r.status.toLowerCase().includes(query) ||
-    r.device.toLowerCase().includes(query)
-  );
-  renderModalAttendanceRows(filtered);
+
+  // Filter by query if any
+  if (query) {
+    records = records.filter(r => 
+      r.dateStr.toLowerCase().includes(query) || 
+      r.displayDate.toLowerCase().includes(query) || 
+      r.status.toLowerCase().includes(query) ||
+      r.device.toLowerCase().includes(query)
+    );
+  }
+
+  // Update Modal Quick Metrics for this filtered scope
+  const totalDays = records.length;
+  const onTimeDays = records.filter(r => !r.isLate).length;
+  const punctualityRate = totalDays > 0 ? Math.round((onTimeDays / totalDays) * 100) : 100;
+  const totalPunches = records.reduce((sum, r) => sum + r.punchesCount, 0);
+
+  const daysLabelEl = document.getElementById('modal-metric-days-label');
+  const daysEl = document.getElementById('modal-metric-days');
+  const punchesEl = document.getElementById('modal-metric-punches');
+  const punctEl = document.getElementById('modal-metric-punctuality');
+  const payoutEl = document.getElementById('modal-metric-payout');
+
+  if (daysLabelEl) {
+    if (modalSelectedMonth) {
+      const [y, m] = modalSelectedMonth.split('-').map(Number);
+      const mName = new Date(y, m - 1, 1).toLocaleDateString([], { month: 'short' });
+      daysLabelEl.textContent = `Days Present (${mName})`;
+    } else {
+      daysLabelEl.textContent = 'Total Days Present';
+    }
+  }
+
+  if (daysEl) daysEl.textContent = totalDays;
+  if (punchesEl) punchesEl.textContent = totalPunches;
+  if (punctEl) punctEl.textContent = `${punctualityRate}%`;
+
+  if (payoutEl && activeAttendanceModalEmp) {
+    const salary = Number(activeAttendanceModalEmp.salary) || 0;
+    if (salary > 0 && modalSelectedMonth) {
+      const [y, m] = modalSelectedMonth.split('-').map(Number);
+      const dim = new Date(y, m, 0).getDate();
+      const estPay = Math.round((totalDays / dim) * salary);
+      payoutEl.textContent = formatCurrency(estPay > 0 ? estPay : (totalDays > 0 ? salary : 0));
+    } else if (salary > 0) {
+      payoutEl.textContent = `${formatCurrency(salary)}/mo`;
+    } else {
+      payoutEl.textContent = '₹0';
+    }
+  }
+
+  renderModalAttendanceRows(records);
 }
 
 function renderModalAttendanceRows(records) {
@@ -2332,9 +2768,9 @@ function renderModalAttendanceRows(records) {
   if (!records || records.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="py-12 text-center text-slate-400 dark:text-gray-500">
+        <td colspan="7" class="py-12 text-center text-slate-400 dark:text-gray-500">
           <i data-lucide="calendar-x" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-gray-600"></i>
-          <p class="text-xs font-semibold">No attendance records found for this employee.</p>
+          <p class="text-xs font-semibold">No attendance records found for this period.</p>
         </td>
       </tr>
     `;
@@ -2366,13 +2802,113 @@ function renderModalAttendanceRows(records) {
       <td class="py-2.5 px-3 text-slate-500 text-[11px] truncate max-w-[120px]" title="${escapeHtml(r.device)}">
         ${escapeHtml(r.device)}
       </td>
-      <td class="py-2.5 px-3.5 text-right font-bold text-slate-700 dark:text-slate-300">
+      <td class="py-2.5 px-3 text-center font-bold text-slate-700 dark:text-slate-300 font-mono">
         ${r.punchesCount}
+      </td>
+      <td class="py-2.5 px-3.5 text-right">
+        <button onclick="openEditAttendanceModal('${r.punchId}')" class="p-1 rounded-lg text-slate-400 hover:text-[#167BB0] hover:bg-[#167BB0]/10 transition-all cursor-pointer" title="Edit Punch Record">
+          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+        </button>
       </td>
     </tr>
   `).join('');
 
   if (summaryEl) summaryEl.textContent = `Showing ${records.length} date record(s)`;
+  safeCreateIcons();
+}
+
+// Render Month-Wise Summary Table inside Employee Modal
+function renderModalMonthlyRows() {
+  const tbody = document.getElementById('modal-monthly-rows');
+  const summaryEl = document.getElementById('modal-attendance-summary');
+  if (!tbody || !activeAttendanceModalEmp) return;
+
+  const empKey = (activeAttendanceModalEmp.name || '').trim().toLowerCase();
+  const rawLogs = (attendanceLogs || []).filter(log => 
+    log.employee_id === activeAttendanceModalEmp.id || 
+    ((log.employee_name || '').trim().toLowerCase() === empKey)
+  );
+
+  if (rawLogs.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="py-12 text-center text-slate-400 dark:text-gray-500">
+          <i data-lucide="calendar-x" class="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-gray-600"></i>
+          <p class="text-xs font-semibold">No monthly attendance history found.</p>
+        </td>
+      </tr>
+    `;
+    if (summaryEl) summaryEl.textContent = 'Showing 0 month(s)';
+    safeCreateIcons();
+    return;
+  }
+
+  // Group by YYYY-MM
+  const monthMap = new Map();
+  for (const log of rawLogs) {
+    const ym = log.created_at.slice(0, 7);
+    if (!monthMap.has(ym)) {
+      monthMap.set(ym, []);
+    }
+    monthMap.get(ym).push(log);
+  }
+
+  const sortedMonths = Array.from(monthMap.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  const salary = Number(activeAttendanceModalEmp.salary) || 0;
+
+  tbody.innerHTML = sortedMonths.map(([ym, logs]) => {
+    const [y, m] = ym.split('-').map(Number);
+    const monthName = new Date(y, m - 1, 1).toLocaleDateString([], { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(y, m, 0).getDate();
+
+    // Group by date to count days present
+    const dateSet = new Set(logs.map(l => formatLocalYMD(new Date(l.created_at))));
+    const daysPresent = dateSet.size;
+
+    let onTimeDays = 0;
+    let lateDays = 0;
+
+    dateSet.forEach(dStr => {
+      const dayLogs = logs.filter(l => formatLocalYMD(new Date(l.created_at)) === dStr);
+      dayLogs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const punc = getPunchPunctuality(dayLogs[0]);
+      if (punc === 'Late') lateDays++;
+      else onTimeDays++;
+    });
+
+    const onTimePct = daysPresent > 0 ? Math.round((onTimeDays / daysPresent) * 100) : 100;
+    const estPayout = salary > 0 ? Math.round((daysPresent / daysInMonth) * salary) : 0;
+
+    return `
+      <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+        <td class="py-3 px-3.5 font-bold text-slate-900 dark:text-white">
+          ${escapeHtml(monthName)}
+        </td>
+        <td class="py-3 px-3 font-mono font-bold text-[#167BB0] dark:text-sky-300">
+          ${daysPresent} <span class="text-[10px] text-slate-400 font-normal">/${daysInMonth}d</span>
+        </td>
+        <td class="py-3 px-3 font-mono text-slate-700 dark:text-slate-300">
+          ${logs.length}
+        </td>
+        <td class="py-3 px-3">
+          <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">${onTimeDays}</span>
+        </td>
+        <td class="py-3 px-3 font-semibold text-emerald-600 dark:text-emerald-400">
+          ${onTimePct}%
+        </td>
+        <td class="py-3 px-3 font-bold text-slate-900 dark:text-white">
+          ${formatCurrency(estPayout > 0 ? estPayout : (daysPresent > 0 ? salary : 0))}
+        </td>
+        <td class="py-3 px-3.5 text-right">
+          <button type="button" onclick="setModalMonthFilter('${ym}'); setModalViewMode('daily');" class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#167BB0]/10 hover:bg-[#167BB0] text-[#167BB0] hover:text-white transition-all cursor-pointer">
+            View Dates
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  if (summaryEl) summaryEl.textContent = `Showing ${sortedMonths.length} active month(s)`;
   safeCreateIcons();
 }
 
@@ -3049,56 +3585,122 @@ function exportToCSV() {
   document.body.removeChild(link);
 }
 
-// Export Summary Report to CSV
+// Export Summary Report to CSV (Supports Monthly Master Roster and Daily Log)
 function exportSummaryCSV() {
-  const summaryPicker = document.getElementById('summary-date-picker');
-  const selectedDateStr = summaryPicker && summaryPicker.value 
-    ? summaryPicker.value 
-    : new Date().toISOString().slice(0, 10);
-
   if (!employeesList.length) {
     alert('No employee data available to export.');
     return;
   }
 
-  const headers = ['Employee Name', 'Employee Code', 'Department', 'Date', 'Status', 'Punch Time', 'Punctuality'];
-  const rows = employeesList.map(emp => {
-    const empKey = (emp.name || '').trim().toLowerCase();
-    const datePunch = attendanceLogs.find(log => {
-      const logDate = new Date(log.created_at);
-      return logDate.toISOString().slice(0, 10) === selectedDateStr &&
-             ((log.employee_name || '').trim().toLowerCase() === empKey || log.employee_id === emp.id);
+  if (summaryViewMode === 'monthly') {
+    const monthPicker = document.getElementById('summary-month-picker');
+    const selectedYm = monthPicker && monthPicker.value 
+      ? monthPicker.value 
+      : new Date().toISOString().slice(0, 7);
+
+    const [selYear, selMonthNum] = selectedYm.split('-').map(Number);
+    const selMonthIndex = selMonthNum - 1;
+    const daysInMonth = new Date(selYear, selMonthIndex + 1, 0).getDate();
+
+    const headers = ['Employee Name', 'Employee Code', 'Department', 'Month', 'Monthly Salary', 'Days Present', 'On Time Days', 'Late Days', 'Attendance Rate', 'Est Payout'];
+    const rows = employeesList.map(emp => {
+      const empKey = (emp.name || '').trim().toLowerCase();
+      const empMonthLogs = (attendanceLogs || []).filter(log => {
+        const d = new Date(log.created_at);
+        const isMonth = d.getFullYear() === selYear && d.getMonth() === selMonthIndex;
+        const isEmp = log.employee_id === emp.id || ((log.employee_name || '').trim().toLowerCase() === empKey);
+        return isMonth && isEmp;
+      });
+
+      const dateMap = {};
+      empMonthLogs.forEach(log => {
+        const dStr = formatLocalYMD(new Date(log.created_at));
+        if (!dateMap[dStr]) dateMap[dStr] = [];
+        dateMap[dStr].push(log);
+      });
+
+      const presentDays = Object.keys(dateMap).length;
+      let onTimeDays = 0;
+      let lateDays = 0;
+
+      Object.values(dateMap).forEach(dayLogs => {
+        dayLogs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const punc = getPunchPunctuality(dayLogs[0]);
+        if (punc === 'Late') lateDays++;
+        else onTimeDays++;
+      });
+
+      const salary = Number(emp.salary) || 0;
+      const attRate = Math.min(100, Math.round((presentDays / daysInMonth) * 100));
+      const estPay = salary > 0 ? Math.round((presentDays / daysInMonth) * salary) : 0;
+
+      return [
+        `"${emp.name.replace(/"/g, '""')}"`,
+        `"${(emp.employee_code || '').replace(/"/g, '""')}"`,
+        `"${(emp.department || 'General').replace(/"/g, '""')}"`,
+        selectedYm,
+        salary,
+        presentDays,
+        onTimeDays,
+        lateDays,
+        `${attRate}%`,
+        estPay
+      ];
     });
 
-    const isPresent = !!datePunch;
-    let punchTime = '--:--';
-    let punctuality = '--';
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `monthly_attendance_roster_${selectedYm}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } else {
+    const summaryPicker = document.getElementById('summary-date-picker');
+    const selectedDateStr = summaryPicker && summaryPicker.value 
+      ? summaryPicker.value 
+      : new Date().toISOString().slice(0, 10);
 
-    if (isPresent) {
-      const punchObj = new Date(datePunch.created_at);
-      punchTime = punchObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      punctuality = isPunchLate(punchObj) ? 'Late' : 'On Time';
-    }
+    const headers = ['Employee Name', 'Employee Code', 'Department', 'Date', 'Status', 'Punch Time', 'Punctuality'];
+    const rows = employeesList.map(emp => {
+      const empKey = (emp.name || '').trim().toLowerCase();
+      const datePunch = attendanceLogs.find(log => {
+        const logDate = new Date(log.created_at);
+        return logDate.toISOString().slice(0, 10) === selectedDateStr &&
+               ((log.employee_name || '').trim().toLowerCase() === empKey || log.employee_id === emp.id);
+      });
 
-    return [
-      `"${emp.name.replace(/"/g, '""')}"`,
-      `"${(emp.employee_code || '').replace(/"/g, '""')}"`,
-      `"${(emp.department || 'General').replace(/"/g, '""')}"`,
-      selectedDateStr,
-      isPresent ? 'Present' : 'Absent',
-      punchTime,
-      punctuality
-    ];
-  });
+      const isPresent = !!datePunch;
+      let punchTime = '--:--';
+      let punctuality = '--';
 
-  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `attendance_summary_${selectedDateStr}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+      if (isPresent) {
+        const punchObj = new Date(datePunch.created_at);
+        punchTime = punchObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        punctuality = getPunchPunctuality(datePunch);
+      }
+
+      return [
+        `"${emp.name.replace(/"/g, '""')}"`,
+        `"${(emp.employee_code || '').replace(/"/g, '""')}"`,
+        `"${(emp.department || 'General').replace(/"/g, '""')}"`,
+        selectedDateStr,
+        isPresent ? 'Present' : 'Absent',
+        punchTime,
+        punctuality
+      ];
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `attendance_summary_${selectedDateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 }
 
 // Modal Handlers: Manual Punch Correction
@@ -3498,4 +4100,563 @@ function renderSampleDemoData() {
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s]);
+}
+
+// ==============================================================
+// APPLICATION TOAST NOTIFICATION
+// ==============================================================
+function showAppToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  const isError = type === 'error';
+  const borderCol = isError ? 'border-rose-500/50' : 'border-[#167BB0]/50';
+  const textCol = isError ? 'text-rose-600 dark:text-rose-400' : 'text-[#167BB0] dark:text-sky-300';
+  const iconName = isError ? 'alert-triangle' : 'check-circle-2';
+
+  toast.className = `fixed bottom-6 right-6 z-50 flex items-center space-x-3 px-4 py-3 rounded-2xl shadow-2xl border bg-white dark:bg-[#151B28] ${borderCol} ${textCol} transition-all duration-300 transform translate-y-2 opacity-0 text-xs font-semibold`;
+  toast.innerHTML = `
+    <i data-lucide="${iconName}" class="w-4 h-4"></i>
+    <span>${escapeHtml(message)}</span>
+  `;
+  document.body.appendChild(toast);
+  safeCreateIcons();
+
+  requestAnimationFrame(() => {
+    toast.classList.remove('translate-y-2', 'opacity-0');
+  });
+
+  setTimeout(() => {
+    toast.classList.add('translate-y-2', 'opacity-0');
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+// ==============================================================
+// EDIT EMPLOYEE DETAILS & SALARY CONTROLLERS
+// ==============================================================
+let editEnrollStream = null;
+let capturedEditPhoto = undefined;
+let capturedEditEmbedding = undefined;
+
+function openEditEmployeeModal(empId) {
+  const emp = employeesList.find(e => e.id === empId);
+  if (!emp) {
+    alert('Employee not found.');
+    return;
+  }
+
+  capturedEditPhoto = undefined;
+  capturedEditEmbedding = undefined;
+
+  document.getElementById('edit-emp-id').value = emp.id;
+  document.getElementById('edit-emp-name').value = emp.name || '';
+  document.getElementById('edit-emp-phone').value = emp.phone || '';
+  document.getElementById('edit-emp-code').value = emp.employee_code || '';
+  document.getElementById('edit-emp-dept').value = emp.department || 'General';
+  document.getElementById('edit-emp-salary').value = emp.salary || 0;
+
+  const fileInput = document.getElementById('edit-emp-file-input');
+  if (fileInput) fileInput.value = '';
+
+  const avatarPreview = document.getElementById('edit-emp-avatar-preview');
+  const statusText = document.getElementById('edit-enroll-status-text');
+  const removeBtn = document.getElementById('edit-remove-photo-btn');
+
+  if (avatarPreview) {
+    avatarPreview.innerHTML = emp.photo_url 
+      ? `<img src="${emp.photo_url}" class="w-full h-full object-cover">`
+      : `<span class="uppercase">${escapeHtml(emp.name.charAt(0))}</span>`;
+  }
+  if (statusText) {
+    statusText.textContent = emp.photo_url ? 'Photo currently active. Upload new photo to change.' : 'No photo uploaded. Upload or capture face.';
+    statusText.className = 'text-[11px] text-slate-400 block';
+  }
+  if (removeBtn) {
+    if (emp.photo_url) removeBtn.classList.remove('hidden');
+    else removeBtn.classList.add('hidden');
+  }
+
+  document.getElementById('edit-employee-modal').classList.remove('hidden');
+  safeCreateIcons();
+}
+
+function closeEditEmployeeModal() {
+  stopEditEnrollCamera();
+  document.getElementById('edit-employee-modal').classList.add('hidden');
+}
+
+function handleEditFileUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const statusText = document.getElementById('edit-enroll-status-text');
+  const avatarPreview = document.getElementById('edit-emp-avatar-preview');
+  const removeBtn = document.getElementById('edit-remove-photo-btn');
+
+  if (statusText) {
+    statusText.textContent = 'Processing image...';
+    statusText.className = 'text-[11px] text-[#167BB0] font-medium block';
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const img = new Image();
+    img.onload = async function() {
+      const canvas = document.createElement('canvas');
+      const maxDim = 480;
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      capturedEditPhoto = canvas.toDataURL('image/jpeg', 0.85);
+
+      if (avatarPreview) {
+        avatarPreview.innerHTML = `<img src="${capturedEditPhoto}" class="w-full h-full object-cover">`;
+      }
+      if (removeBtn) removeBtn.classList.remove('hidden');
+
+      if (typeof faceapi !== 'undefined' && faceapi.nets.ssdMobilenetv1.params) {
+        try {
+          const detection = await faceapi.detectSingleFace(canvas).withFaceLandmarks().withFaceDescriptor();
+          if (detection) {
+            capturedEditEmbedding = Array.from(detection.descriptor);
+            if (statusText) {
+              statusText.textContent = '✓ Biometric face embedded successfully!';
+              statusText.className = 'text-[11px] text-emerald-600 font-semibold block';
+            }
+          } else {
+            if (statusText) {
+              statusText.textContent = 'Photo attached (Face detection pending)';
+              statusText.className = 'text-[11px] text-amber-600 block';
+            }
+          }
+        } catch (_) {
+          if (statusText) {
+            statusText.textContent = 'Photo attached successfully';
+            statusText.className = 'text-[11px] text-emerald-600 block';
+          }
+        }
+      } else {
+        if (statusText) {
+          statusText.textContent = 'Photo attached successfully';
+          statusText.className = 'text-[11px] text-emerald-600 block';
+        }
+      }
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearEditEnrollPhoto() {
+  capturedEditPhoto = null;
+  capturedEditEmbedding = null;
+  const avatarPreview = document.getElementById('edit-emp-avatar-preview');
+  const statusText = document.getElementById('edit-enroll-status-text');
+  const removeBtn = document.getElementById('edit-remove-photo-btn');
+  const fileInput = document.getElementById('edit-emp-file-input');
+
+  if (avatarPreview) avatarPreview.innerHTML = '<i data-lucide="user" class="w-7 h-7"></i>';
+  if (statusText) {
+    statusText.textContent = 'Photo removed. Click Save Changes to confirm.';
+    statusText.className = 'text-[11px] text-rose-500 block';
+  }
+  if (removeBtn) removeBtn.classList.add('hidden');
+  if (fileInput) fileInput.value = '';
+  safeCreateIcons();
+}
+
+async function startEditEnrollCamera() {
+  const container = document.getElementById('edit-enroll-cam-container');
+  const video = document.getElementById('edit-enroll-video');
+  const btnText = document.getElementById('edit-enroll-btn-text');
+
+  try {
+    editEnrollStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+    });
+    if (video) {
+      video.srcObject = editEnrollStream;
+      await video.play();
+    }
+    if (container) container.classList.remove('hidden');
+    if (btnText) btnText.textContent = 'Camera Active';
+  } catch (err) {
+    alert('Camera access denied or unavailable: ' + err.message);
+  }
+}
+
+function stopEditEnrollCamera() {
+  if (editEnrollStream) {
+    editEnrollStream.getTracks().forEach(t => t.stop());
+    editEnrollStream = null;
+  }
+  const container = document.getElementById('edit-enroll-cam-container');
+  if (container) container.classList.add('hidden');
+  const btnText = document.getElementById('edit-enroll-btn-text');
+  if (btnText) btnText.textContent = 'Live Photo';
+}
+
+async function captureEditEnrollPhoto() {
+  const video = document.getElementById('edit-enroll-video');
+  const canvas = document.getElementById('edit-enroll-canvas');
+  const avatarPreview = document.getElementById('edit-emp-avatar-preview');
+  const statusText = document.getElementById('edit-enroll-status-text');
+  const removeBtn = document.getElementById('edit-remove-photo-btn');
+
+  if (!video || !canvas) return;
+  canvas.width = video.videoWidth || 320;
+  canvas.height = video.videoHeight || 240;
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+  ctx.restore();
+
+  capturedEditPhoto = canvas.toDataURL('image/jpeg', 0.85);
+
+  if (avatarPreview) {
+    avatarPreview.innerHTML = `<img src="${capturedEditPhoto}" class="w-full h-full object-cover">`;
+  }
+  if (removeBtn) removeBtn.classList.remove('hidden');
+  stopEditEnrollCamera();
+
+  if (typeof faceapi !== 'undefined' && faceapi.nets.ssdMobilenetv1.params) {
+    try {
+      const detection = await faceapi.detectSingleFace(canvas).withFaceLandmarks().withFaceDescriptor();
+      if (detection) {
+        capturedEditEmbedding = Array.from(detection.descriptor);
+        if (statusText) {
+          statusText.textContent = '✓ Live face captured & biometric profile verified!';
+          statusText.className = 'text-[11px] text-emerald-600 font-semibold block';
+        }
+      } else {
+        if (statusText) {
+          statusText.textContent = 'Face captured (position clearer if possible)';
+          statusText.className = 'text-[11px] text-amber-600 block';
+        }
+      }
+    } catch (_) {
+      if (statusText) {
+        statusText.textContent = 'Live face captured';
+        statusText.className = 'text-[11px] text-emerald-600 block';
+      }
+    }
+  } else {
+    if (statusText) {
+      statusText.textContent = 'Live face captured';
+      statusText.className = 'text-[11px] text-emerald-600 block';
+    }
+  }
+}
+
+async function handleUpdateEmployee(e) {
+  e.preventDefault();
+  const empId = document.getElementById('edit-emp-id').value;
+  const name = document.getElementById('edit-emp-name').value.trim();
+  const phone = (document.getElementById('edit-emp-phone')?.value || '').trim();
+  const code = document.getElementById('edit-emp-code').value.trim();
+  const dept = document.getElementById('edit-emp-dept').value.trim();
+  const salaryVal = parseFloat(document.getElementById('edit-emp-salary')?.value || '0');
+  const salary = isNaN(salaryVal) ? 0 : salaryVal;
+
+  if (!empId) return;
+
+  const btn = document.getElementById('save-edit-emp-btn');
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Saving...</span>';
+  safeCreateIcons();
+
+  try {
+    const payload = {
+      name,
+      phone: phone || null,
+      employee_code: code || null,
+      department: dept || 'General',
+      salary: salary,
+      updated_at: new Date().toISOString()
+    };
+
+    if (capturedEditPhoto !== undefined) {
+      payload.photo_url = capturedEditPhoto;
+    }
+    if (capturedEditEmbedding !== undefined) {
+      payload.embeddings = capturedEditEmbedding;
+    }
+
+    if (supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from('employees')
+        .update(payload)
+        .eq('id', empId)
+        .select();
+
+      if (error) {
+        console.warn('Employee update warning, retrying without optional columns:', error.message);
+        if (payload.salary !== undefined) delete payload.salary;
+        if (payload.phone) delete payload.phone;
+        const retryRes = await supabaseClient
+          .from('employees')
+          .update(payload)
+          .eq('id', empId)
+          .select();
+        if (retryRes.error) throw retryRes.error;
+      }
+    }
+
+    // Update in-memory employee object
+    const targetEmp = employeesList.find(e => e.id === empId);
+    if (targetEmp) {
+      targetEmp.name = name;
+      targetEmp.phone = phone || null;
+      targetEmp.employee_code = code || null;
+      targetEmp.department = dept || 'General';
+      targetEmp.salary = salary;
+      if (capturedEditPhoto !== undefined) targetEmp.photo_url = capturedEditPhoto;
+      if (capturedEditEmbedding !== undefined) targetEmp.embeddings = capturedEditEmbedding;
+    }
+
+    // Also update any matching employee name in attendanceLogs in memory
+    attendanceLogs.forEach(log => {
+      if (log.employee_id === empId) {
+        log.employee_name = name;
+        if (capturedEditPhoto !== undefined && capturedEditPhoto) {
+          log.photo_url = capturedEditPhoto;
+        }
+      }
+    });
+
+    closeEditEmployeeModal();
+
+    // Refresh UI components
+    renderEmployees(employeesList);
+    renderAttendanceLogs(attendanceLogs);
+    renderSummaryView();
+    updateMetrics();
+
+    // If Employee Attendance Modal is open for this employee, refresh its header
+    if (activeAttendanceModalEmp && activeAttendanceModalEmp.id === empId) {
+      openEmployeeAttendanceModal(empId);
+    }
+
+    showAppToast(`Employee "${name}" updated successfully!`);
+  } catch (err) {
+    alert('Error updating employee: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+    safeCreateIcons();
+  }
+}
+
+// ==============================================================
+// EDIT ATTENDANCE RECORD CONTROLLERS
+// ==============================================================
+function openEditAttendanceModal(logId) {
+  const log = attendanceLogs.find(l => l.id === logId);
+  if (!log) {
+    alert('Attendance record not found.');
+    return;
+  }
+
+  document.getElementById('edit-att-id').value = log.id;
+
+  // Populate employee select
+  const empSelect = document.getElementById('edit-att-emp-select');
+  if (empSelect) {
+    empSelect.innerHTML = employeesList.map(e => `
+      <option value="${e.id}" ${e.id === log.employee_id || e.name.toLowerCase() === (log.employee_name || '').toLowerCase() ? 'selected' : ''}>
+        ${escapeHtml(e.name)} (${escapeHtml(e.employee_code || 'General')})
+      </option>
+    `).join('');
+  }
+
+  // Parse date and time
+  const d = new Date(log.created_at);
+  const dateVal = formatLocalYMD(d);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+
+  const dateInput = document.getElementById('edit-att-date');
+  if (dateInput) dateInput.value = dateVal;
+
+  const timeInput = document.getElementById('edit-att-time');
+  if (timeInput) timeInput.value = `${hh}:${mm}:${ss}`;
+
+  // Current Punctuality
+  const currentPunc = getPunchPunctuality(log);
+  const puncSelect = document.getElementById('edit-att-punctuality');
+  if (puncSelect) {
+    if (punctualityOverrides[log.id] || log.punctuality) {
+      puncSelect.value = currentPunc;
+    } else {
+      puncSelect.value = 'Auto';
+    }
+  }
+
+  // Punch Type
+  const punchTypeSelect = document.getElementById('edit-att-punch-type');
+  if (punchTypeSelect) {
+    punchTypeSelect.value = log.punch_type || 'IN';
+  }
+
+  // Device
+  const devInput = document.getElementById('edit-att-device');
+  if (devInput) devInput.value = log.device_id || 'Web-Kiosk';
+
+  document.getElementById('edit-attendance-modal').classList.remove('hidden');
+  safeCreateIcons();
+}
+
+function closeEditAttendanceModal() {
+  document.getElementById('edit-attendance-modal').classList.add('hidden');
+}
+
+function setEditPunchQuickPunctuality(status) {
+  const select = document.getElementById('edit-att-punctuality');
+  const timeInput = document.getElementById('edit-att-time');
+  if (select) select.value = status;
+
+  if (timeInput) {
+    if (status === 'On Time') {
+      const cur = timeInput.value;
+      if (cur > '09:30:00') timeInput.value = '09:15:00';
+    } else if (status === 'Late') {
+      const cur = timeInput.value;
+      if (cur <= '09:30:00') timeInput.value = '09:45:00';
+    }
+  }
+}
+
+async function handleUpdateAttendance(e) {
+  e.preventDefault();
+  const logId = document.getElementById('edit-att-id').value;
+  const empSelect = document.getElementById('edit-att-emp-select');
+  const dateVal = document.getElementById('edit-att-date').value;
+  const timeVal = document.getElementById('edit-att-time').value;
+  const punctualityVal = document.getElementById('edit-att-punctuality').value;
+  const punchType = document.getElementById('edit-att-punch-type').value;
+  const deviceId = (document.getElementById('edit-att-device').value || '').trim() || 'Manual HR Correction';
+
+  if (!logId || !dateVal || !timeVal) return;
+
+  const btn = document.getElementById('save-edit-att-btn');
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Saving...</span>';
+  safeCreateIcons();
+
+  try {
+    const selectedEmpId = empSelect ? empSelect.value : null;
+    const selectedEmp = employeesList.find(e => e.id === selectedEmpId);
+    const empName = selectedEmp ? selectedEmp.name : 'Unknown';
+
+    // Construct valid ISO timestamp
+    const timeParts = timeVal.split(':');
+    const hh = timeParts[0] || '09';
+    const mm = timeParts[1] || '00';
+    const ss = timeParts[2] || '00';
+    const timestampIso = new Date(`${dateVal}T${hh}:${mm}:${ss}`).toISOString();
+
+    const payload = {
+      employee_id: selectedEmpId || null,
+      employee_name: empName,
+      created_at: timestampIso,
+      punch_type: punchType,
+      device_id: deviceId
+    };
+
+    if (punctualityVal && punctualityVal !== 'Auto') {
+      payload.punctuality = punctualityVal;
+    }
+
+    if (supabaseClient) {
+      let { data, error } = await supabaseClient
+        .from('attendance_logs')
+        .update(payload)
+        .eq('id', logId)
+        .select();
+
+      if (error) {
+        if (payload.punctuality) {
+          console.warn('Punctuality column not found in attendance_logs. Updating timestamp & device:', error.message);
+          delete payload.punctuality;
+          const retryRes = await supabaseClient
+            .from('attendance_logs')
+            .update(payload)
+            .eq('id', logId)
+            .select();
+          if (retryRes.error) throw retryRes.error;
+          data = retryRes.data;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    // Save punctuality override in local storage cache
+    if (punctualityVal && punctualityVal !== 'Auto') {
+      punctualityOverrides[logId] = punctualityVal;
+    } else {
+      delete punctualityOverrides[logId];
+    }
+    try {
+      localStorage.setItem('a10d_punctuality_overrides', JSON.stringify(punctualityOverrides));
+    } catch (_) {}
+
+    // Update in-memory attendance log
+    const targetLog = attendanceLogs.find(l => l.id === logId);
+    if (targetLog) {
+      targetLog.employee_id = selectedEmpId;
+      targetLog.employee_name = empName;
+      targetLog.created_at = timestampIso;
+      targetLog.punch_type = punchType;
+      targetLog.device_id = deviceId;
+      if (punctualityVal && punctualityVal !== 'Auto') {
+        targetLog.punctuality = punctualityVal;
+      } else {
+        delete targetLog.punctuality;
+      }
+      if (selectedEmp && selectedEmp.photo_url) {
+        targetLog.photo_url = selectedEmp.photo_url;
+      }
+    }
+
+    closeEditAttendanceModal();
+
+    // Refresh UI
+    renderAttendanceLogs(attendanceLogs);
+    renderSummaryView();
+    updateMetrics();
+
+    // If Employee Attendance Modal is open, refresh it as well
+    if (activeAttendanceModalEmp) {
+      openEmployeeAttendanceModal(activeAttendanceModalEmp.id);
+    }
+
+    showAppToast('Attendance record updated successfully!');
+  } catch (err) {
+    alert('Error updating attendance record: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+    safeCreateIcons();
+  }
 }

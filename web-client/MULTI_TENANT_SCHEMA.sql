@@ -10,9 +10,12 @@ ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCAD
 
 CREATE INDEX IF NOT EXISTS idx_employees_user_id ON public.employees(user_id);
 
--- 2. Add user_id (Tenant ID) to attendance_logs table
+-- 2. Add user_id (Tenant ID) and punctuality to attendance_logs table
 ALTER TABLE public.attendance_logs 
 ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE public.attendance_logs 
+ADD COLUMN IF NOT EXISTS punctuality TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_attendance_user_id ON public.attendance_logs(user_id);
 
