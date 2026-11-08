@@ -56,9 +56,10 @@ class FaceRecognitionService {
   factory FaceRecognitionService() => _instance;
   FaceRecognitionService._internal();
 
-  static const String _usersKey = 'registered_attendance_faces_v3';
-  // Cosine similarity threshold for biometric geometric matching
-  static const double matchThreshold = 0.70;
+  static const String _usersKey = 'registered_attendance_faces_v5';
+  // High-precision cosine similarity threshold & runner-up ambiguity margin
+  static const double matchThreshold = 0.80;
+  static const double ambiguityMargin = 0.07;
 
   // Sliding window buffer for liveness & anti-spoofing detection
   final List<LivenessSample> _livenessHistory = [];
@@ -273,7 +274,25 @@ class FaceRecognitionService {
             }
           } catch (_) {}
         } else if (photoUrl != null && photoUrl.isNotEmpty) {
-          localPhotoPath = photoUrl;
+          if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+            try {
+              final client = HttpClient();
+              final request = await client.getUrl(Uri.parse(photoUrl));
+              final response = await request.close();
+              if (response.statusCode == 200) {
+                final bytes = await consolidateHttpClientResponseBytes(response);
+                final appDir = await getApplicationDocumentsDirectory();
+                final fileName = 'cloud_face_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                final file = File(p.join(appDir.path, fileName));
+                await file.writeAsBytes(bytes);
+                localPhotoPath = file.path;
+              }
+            } catch (e) {
+              debugPrint('Notice downloading remote face photo for ${name.trim()}: $e');
+            }
+          } else {
+            localPhotoPath = photoUrl;
+          }
         }
 
         // BIOMETRIC RESOLUTION: If photo is available, extract the exact ML Kit geometric vector!
@@ -310,7 +329,7 @@ class FaceRecognitionService {
     debugPrint('FaceRecognitionService: Local face database reconciled with ${updatedList.length} enrolled users.');
   }
 
-  /// High-speed biometric embedding extraction
+  /// High-speed biometric embedding extraction with scale-invariant geometry and visual grid
   Future<({Face face, List<double> embedding, String? croppedPath})?>
       extractFaceEmbedding(String imagePath, {bool generateCrop = false}) async {
     final inputImage = InputImage.fromFilePath(imagePath);
@@ -329,40 +348,41 @@ class FaceRecognitionService {
 
     final primaryFace = faces.first;
     String? croppedPath;
+    img.Image? faceCrop;
 
-    if (generateCrop) {
-      try {
-        final file = File(imagePath);
-        final bytes = await file.readAsBytes();
-        final decoded = img.decodeImage(bytes);
+    try {
+      final file = File(imagePath);
+      final bytes = await file.readAsBytes();
+      final decoded = img.decodeImage(bytes);
 
-        if (decoded != null) {
-          final box = primaryFace.boundingBox;
-          final padX = (box.width * 0.15).toInt();
-          final padY = (box.height * 0.15).toInt();
+      if (decoded != null) {
+        final box = primaryFace.boundingBox;
+        final padX = (box.width * 0.15).toInt();
+        final padY = (box.height * 0.15).toInt();
 
-          final x = math.max(0, (box.left.toInt() - padX));
-          final y = math.max(0, (box.top.toInt() - padY));
-          final w = math.min(decoded.width - x, (box.width.toInt() + padX * 2));
-          final h = math.min(decoded.height - y, (box.height.toInt() + padY * 2));
+        final x = math.max(0, (box.left.toInt() - padX));
+        final y = math.max(0, (box.top.toInt() - padY));
+        final w = math.min(decoded.width - x, (box.width.toInt() + padX * 2));
+        final h = math.min(decoded.height - y, (box.height.toInt() + padY * 2));
 
-          if (w > 10 && h > 10) {
-            final cropped = img.copyCrop(decoded, x: x, y: y, width: w, height: h);
+        if (w > 10 && h > 10) {
+          faceCrop = img.copyCrop(decoded, x: x, y: y, width: w, height: h);
+          if (generateCrop) {
             final tempDir = await getTemporaryDirectory();
             final cropFile = File(
               p.join(tempDir.path, 'crop_${DateTime.now().millisecondsSinceEpoch}.jpg'),
             );
-            await cropFile.writeAsBytes(img.encodeJpg(cropped, quality: 80));
+            await cropFile.writeAsBytes(img.encodeJpg(faceCrop, quality: 80));
             croppedPath = cropFile.path;
           }
         }
-      } catch (e) {
-        debugPrint('Crop generation notice: $e');
       }
+    } catch (e) {
+      debugPrint('Crop generation notice: $e');
     }
 
-    final geometricFeatures = _buildGeometricVector(primaryFace);
-    final normalizedEmbedding = _l2Normalize(geometricFeatures);
+    final biometricFeatures = _buildBiometricVector(primaryFace, faceCrop);
+    final normalizedEmbedding = _l2Normalize(biometricFeatures);
 
     return (
       face: primaryFace,
@@ -429,22 +449,34 @@ class FaceRecognitionService {
 
     RegisteredUser? bestMatch;
     double highestScore = -1.0;
+    double secondHighestScore = -1.0;
 
     for (final candidate in registeredUsers) {
+      double candidateMax = -1.0;
       for (final viewEmbedding in candidate.embeddings) {
         final similarity = _calculateCosineSimilarity(
           extraction.embedding,
           viewEmbedding,
         );
 
-        if (similarity > highestScore) {
-          highestScore = similarity;
-          bestMatch = candidate;
+        if (similarity > candidateMax) {
+          candidateMax = similarity;
         }
+      }
+
+      if (candidateMax > highestScore) {
+        secondHighestScore = highestScore;
+        highestScore = candidateMax;
+        bestMatch = candidate;
+      } else if (candidateMax > secondHighestScore) {
+        secondHighestScore = candidateMax;
       }
     }
 
-    if (highestScore >= matchThreshold && bestMatch != null) {
+    final bool hasAmbiguity = registeredUsers.length > 1 &&
+        (highestScore - secondHighestScore) < ambiguityMargin;
+
+    if (highestScore >= matchThreshold && bestMatch != null && !hasAmbiguity) {
       return RecognitionResult(
         isPersonDetected: true,
         isRecognized: true,
@@ -454,6 +486,16 @@ class FaceRecognitionService {
         isLivenessVerified: livenessCheck.isLive,
         livenessReason: livenessCheck.reason,
         message: bestMatch.name,
+      );
+    } else if (hasAmbiguity && highestScore >= matchThreshold) {
+      return RecognitionResult(
+        isPersonDetected: true,
+        isRecognized: false,
+        confidence: highestScore,
+        detectedFace: face,
+        isLivenessVerified: false,
+        livenessReason: 'Multiple matching profiles — face camera directly',
+        message: 'Ambiguous Face Match',
       );
     } else {
       return RecognitionResult(
@@ -509,91 +551,172 @@ class FaceRecognitionService {
     return (isLive: false, reason: 'Blink or turn head slightly');
   }
 
-  List<double> _buildGeometricVector(Face face) {
+  List<double> _buildBiometricVector(Face face, [img.Image? faceCrop]) {
     final box = face.boundingBox;
     final w = box.width.abs() > 0 ? box.width : 1.0;
     final h = box.height.abs() > 0 ? box.height : 1.0;
 
     final List<double> vec = [];
 
-    // Face aspect ratio & head pose
-    vec.add((w / h).clamp(0.2, 4.0));
-    vec.add(((face.headEulerAngleY ?? 0.0) / 90.0).clamp(-1.0, 1.0));
-    vec.add(((face.headEulerAngleZ ?? 0.0) / 90.0).clamp(-1.0, 1.0));
+    // 1. Identify eye center & inter-ocular distance
+    final leftEye = face.landmarks[FaceLandmarkType.leftEye]?.position;
+    final rightEye = face.landmarks[FaceLandmarkType.rightEye]?.position;
+    final nose = face.landmarks[FaceLandmarkType.noseBase]?.position;
+    final leftMouth = face.landmarks[FaceLandmarkType.leftMouth]?.position;
+    final rightMouth = face.landmarks[FaceLandmarkType.rightMouth]?.position;
+    final bottomMouth = face.landmarks[FaceLandmarkType.bottomMouth]?.position;
+    final leftCheek = face.landmarks[FaceLandmarkType.leftCheek]?.position;
+    final rightCheek = face.landmarks[FaceLandmarkType.rightCheek]?.position;
+    final leftEar = face.landmarks[FaceLandmarkType.leftEar]?.position;
+    final rightEar = face.landmarks[FaceLandmarkType.rightEar]?.position;
 
-    // Normalized landmark points
-    final landmarks = [
-      face.landmarks[FaceLandmarkType.leftEye],
-      face.landmarks[FaceLandmarkType.rightEye],
-      face.landmarks[FaceLandmarkType.noseBase],
-      face.landmarks[FaceLandmarkType.leftMouth],
-      face.landmarks[FaceLandmarkType.rightMouth],
-      face.landmarks[FaceLandmarkType.bottomMouth],
-      face.landmarks[FaceLandmarkType.leftCheek],
-      face.landmarks[FaceLandmarkType.rightCheek],
-      face.landmarks[FaceLandmarkType.leftEar],
-      face.landmarks[FaceLandmarkType.rightEar],
+    double eyeMidX, eyeMidY, eyeDist;
+    if (leftEye != null && rightEye != null) {
+      eyeMidX = (leftEye.x + rightEye.x) / 2.0;
+      eyeMidY = (leftEye.y + rightEye.y) / 2.0;
+      eyeDist = math.sqrt(
+        math.pow(rightEye.x - leftEye.x, 2) + math.pow(rightEye.y - leftEye.y, 2),
+      );
+    } else {
+      eyeMidX = box.left + w * 0.5;
+      eyeMidY = box.top + h * 0.38;
+      eyeDist = w * 0.42;
+    }
+    if (eyeDist < 5.0) eyeDist = math.max(10.0, w * 0.42);
+
+    // 2. Zero-centered, scale-invariant landmark deviations from canonical facial template
+    final landmarkConfigs = [
+      (leftEye, -0.50, 0.00),
+      (rightEye, 0.50, 0.00),
+      (nose, 0.00, 0.90),
+      (leftMouth, -0.38, 1.45),
+      (rightMouth, 0.38, 1.45),
+      (bottomMouth, 0.00, 1.65),
+      (leftCheek, -0.95, 0.85),
+      (rightCheek, 0.95, 0.85),
+      (leftEar, -1.45, 0.35),
+      (rightEar, 1.45, 0.35),
     ];
 
-    for (final lm in landmarks) {
-      if (lm != null) {
-        vec.add(((lm.position.x - box.left) / w).clamp(-0.5, 1.5));
-        vec.add(((lm.position.y - box.top) / h).clamp(-0.5, 1.5));
+    for (final cfg in landmarkConfigs) {
+      final pos = cfg.$1;
+      final canX = cfg.$2;
+      final canY = cfg.$3;
+      if (pos != null) {
+        final relX = (pos.x - eyeMidX) / eyeDist;
+        final relY = (pos.y - eyeMidY) / eyeDist;
+        vec.add((relX - canX).clamp(-1.5, 1.5));
+        vec.add((relY - canY).clamp(-1.5, 1.5));
       } else {
         vec.add(0.0);
         vec.add(0.0);
       }
     }
 
-    // Relative landmark distances
-    final leftEye = face.landmarks[FaceLandmarkType.leftEye]?.position;
-    final rightEye = face.landmarks[FaceLandmarkType.rightEye]?.position;
-    final nose = face.landmarks[FaceLandmarkType.noseBase]?.position;
-    final bottomMouth = face.landmarks[FaceLandmarkType.bottomMouth]?.position;
-
-    if (leftEye != null && rightEye != null) {
-      final eyeDistance = math.sqrt(
-        math.pow(rightEye.x - leftEye.x, 2) + math.pow(rightEye.y - leftEye.y, 2),
-      );
-      vec.add(eyeDistance / w);
-
-      if (nose != null) {
-        final eyeCenterX = (leftEye.x + rightEye.x) / 2.0;
-        final eyeCenterY = (leftEye.y + rightEye.y) / 2.0;
-        final eyeToNose = math.sqrt(
-          math.pow(nose.x - eyeCenterX, 2) + math.pow(nose.y - eyeCenterY, 2),
-        );
-        vec.add(eyeToNose / h);
-      } else {
-        vec.add(0.0);
-      }
+    // 3. Biometric Anthropometric Ratios (Scale and Pose Invariant)
+    vec.add(((w / h) - 0.78).clamp(-1.0, 1.0)); // Aspect ratio deviation
+    vec.add(((eyeDist / w) - 0.42).clamp(-0.5, 0.5)); // Inter-ocular breadth
+    if (nose != null) {
+      vec.add((((nose.y - eyeMidY) / eyeDist) - 0.90).clamp(-1.0, 1.0)); // Nasal height index
+      vec.add(((nose.x - eyeMidX) / eyeDist).clamp(-0.5, 0.5)); // Nasal midline deviation
     } else {
       vec.add(0.0);
+      vec.add(0.0);
+    }
+
+    if (leftMouth != null && rightMouth != null) {
+      final mouthW = math.sqrt(
+        math.pow(rightMouth.x - leftMouth.x, 2) + math.pow(rightMouth.y - leftMouth.y, 2),
+      );
+      vec.add(((mouthW / eyeDist) - 0.76).clamp(-1.0, 1.0)); // Cheilion mouth breadth
+    } else {
       vec.add(0.0);
     }
 
     if (nose != null && bottomMouth != null) {
-      final noseToMouth = math.sqrt(
-        math.pow(bottomMouth.x - nose.x, 2) + math.pow(bottomMouth.y - nose.y, 2),
-      );
-      vec.add(noseToMouth / h);
+      vec.add((((bottomMouth.y - nose.y) / eyeDist) - 0.75).clamp(-1.0, 1.0)); // Lower third height
     } else {
       vec.add(0.0);
     }
 
-    // Sample points from the face contour
+    if (leftCheek != null && rightCheek != null) {
+      final cheekSpan = math.sqrt(
+        math.pow(rightCheek.x - leftCheek.x, 2) + math.pow(rightCheek.y - leftCheek.y, 2),
+      );
+      vec.add(((cheekSpan / w) - 0.75).clamp(-1.0, 1.0)); // Bizygomatic breadth
+    } else {
+      vec.add(0.0);
+    }
+
+    // 4. Sample 16 normalized points along jawline/mandible contour
     final faceContour = face.contours[FaceContourType.face]?.points;
     if (faceContour != null && faceContour.isNotEmpty) {
       final step = math.max(1, faceContour.length ~/ 16);
       for (int i = 0; i < 16; i++) {
         final idx = (i * step) % faceContour.length;
         final pt = faceContour[idx];
-        vec.add(((pt.x - box.left) / w).clamp(-0.5, 1.5));
-        vec.add(((pt.y - box.top) / h).clamp(-0.5, 1.5));
+        final relX = (pt.x - eyeMidX) / eyeDist;
+        final relY = (pt.y - eyeMidY) / eyeDist;
+        final angle = (i / 16.0) * math.pi;
+        final idealX = 1.35 * math.cos(angle);
+        final idealY = 1.65 * math.sin(angle);
+        vec.add((relX - idealX).clamp(-2.0, 2.0));
+        vec.add((relY - idealY).clamp(-2.0, 2.0));
       }
     } else {
       for (int i = 0; i < 32; i++) {
         vec.add(0.0);
+      }
+    }
+
+    // 5. Visual Spatial Grid Texture Extraction (if face image crop available)
+    if (faceCrop != null) {
+      try {
+        final resized = img.copyResize(faceCrop, width: 36, height: 36);
+        double sumLum = 0.0;
+        double sumLumSq = 0.0;
+        final lumGrid = List<double>.filled(36 * 36, 0.0);
+
+        for (int y = 0; y < 36; y++) {
+          for (int x = 0; x < 36; x++) {
+            final pixel = resized.getPixel(x, y);
+            final lum = 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+            final idx = y * 36 + x;
+            lumGrid[idx] = lum;
+            sumLum += lum;
+            sumLumSq += lum * lum;
+          }
+        }
+
+        final meanLum = sumLum / (36.0 * 36.0);
+        final stdLum = math.max(1.0, math.sqrt((sumLumSq / (36.0 * 36.0)) - (meanLum * meanLum)));
+
+        // 6x6 spatial cells (6x6 pixels each)
+        for (int cy = 0; cy < 6; cy++) {
+          for (int cx = 0; cx < 6; cx++) {
+            double cellSum = 0.0;
+            double cellGradX = 0.0;
+            double cellGradY = 0.0;
+            for (int py = cy * 6; py < (cy + 1) * 6; py++) {
+              for (int px = cx * 6; px < (cx + 1) * 6; px++) {
+                final idx = py * 36 + px;
+                cellSum += (lumGrid[idx] - meanLum) / stdLum;
+
+                final left = px > 0 ? lumGrid[py * 36 + (px - 1)] : lumGrid[idx];
+                final right = px < 35 ? lumGrid[py * 36 + (px + 1)] : lumGrid[idx];
+                final top = py > 0 ? lumGrid[(py - 1) * 36 + px] : lumGrid[idx];
+                final bottom = py < 35 ? lumGrid[(py + 1) * 36 + px] : lumGrid[idx];
+                cellGradX += (right - left) / stdLum;
+                cellGradY += (bottom - top) / stdLum;
+              }
+            }
+            vec.add((cellSum / 36.0).clamp(-3.0, 3.0));
+            vec.add((cellGradX / 36.0).clamp(-3.0, 3.0));
+            vec.add((cellGradY / 36.0).clamp(-3.0, 3.0));
+          }
+        }
+      } catch (e) {
+        debugPrint('Visual grid extraction fallback: $e');
       }
     }
 

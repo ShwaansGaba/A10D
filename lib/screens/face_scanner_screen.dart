@@ -37,6 +37,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
   String? _livenessHint;
   PunchStatus? _lastPunchStatus;
   DateTime? _lastRecognizedTime;
+  String? _consecutiveCandidateId;
+  int _consecutiveMatchCount = 0;
 
   // Kiosk Inactivity Dimming State
   DateTime _lastFaceActivityTime = DateTime.now();
@@ -244,6 +246,23 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
       if (result.isRecognized && result.user != null) {
         final user = result.user!;
 
+        // 2-frame consecutive agreement filter to eliminate transient false positives
+        if (_consecutiveCandidateId == user.id) {
+          _consecutiveMatchCount++;
+        } else {
+          _consecutiveCandidateId = user.id;
+          _consecutiveMatchCount = 1;
+        }
+
+        if (_consecutiveMatchCount < 2) {
+          setState(() {
+            _recognizedUser = user;
+            _isLivenessPassed = false;
+            _livenessHint = 'Verifying identity...';
+          });
+          return;
+        }
+
         // Check Anti-Spoofing (Blink or Head Motion)
         if (!result.isLivenessVerified) {
           // Face recognized, but awaiting genuine blink/motion
@@ -278,6 +297,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
           AudioFeedbackService().announceWelcome(user.name);
         }
       } else {
+        _consecutiveCandidateId = null;
+        _consecutiveMatchCount = 0;
         if (_recognizedUser != null) {
           setState(() {
             _recognizedUser = null;
