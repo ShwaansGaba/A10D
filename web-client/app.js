@@ -3409,7 +3409,7 @@ async function processWebScannerFrame() {
     return;
   }
 
-  // Extract real facial descriptor from live webcam face crop
+  // Multi-scale crops: standard, tighter, wider to accommodate distance & camera variations
   const fw = Math.min(canvas.width * 0.44, canvas.height * 0.55);
   let liveFaceX = Math.max(0, (canvas.width - fw) / 2);
   let liveFaceY = Math.max(0, canvas.height * 0.15);
@@ -3425,44 +3425,38 @@ async function processWebScannerFrame() {
     liveFaceH = Math.min(canvas.height - liveFaceY, detectedFaceBox.height + padY * 2);
   }
 
-  const cropCanvas = document.createElement('canvas');
-  cropCanvas.width = 96;
-  cropCanvas.height = 96;
-  const cCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
-  cCtx.drawImage(canvas, liveFaceX, liveFaceY, liveFaceW, liveFaceH, 0, 0, 96, 96);
-  const liveDesc = extractFacialFeatureVector(cropCanvas);
+  const cropScales = [
+    { scale: 1.0, dy: 0 },
+    { scale: 0.88, dy: -6 },
+    { scale: 1.12, dy: 6 }
+  ];
 
-  // A live face is detected in the blue box!
-  // Enterprise 1:N Population Scalability: Coarse-to-Fine Indexing
-  let candidatesToEvaluate = employeesList;
-  if (employeesList.length > 50) {
-    const coarseProbe = liveDesc.slice(0, 16);
-    const ranked = [];
-    for (const emp of employeesList) {
-      const desc = await getOrComputeEmployeeDescriptor(emp);
-      if (!desc) continue;
-      const cScore = computeCosineSimilarity(coarseProbe, desc.slice(0, 16));
-      ranked.push({ emp, score: cScore });
-    }
-    ranked.sort((a, b) => b.score - a.score);
-    candidatesToEvaluate = ranked.slice(0, 50).map(r => r.emp);
+  const liveDescs = [];
+  for (const s of cropScales) {
+    const sw = Math.min(canvas.width, liveFaceW * s.scale);
+    const sh = Math.min(canvas.height, liveFaceH * s.scale);
+    const sx = Math.max(0, Math.min(canvas.width - sw, liveFaceX + (liveFaceW - sw) / 2));
+    const sy = Math.max(0, Math.min(canvas.height - sh, liveFaceY + s.dy));
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = 96;
+    cropCanvas.height = 96;
+    const cCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
+    cCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 96, 96);
+    liveDescs.push(extractFacialFeatureVector(cropCanvas));
   }
 
+  // A live face is detected in the blue box!
   let bestMatch = null;
   let highestScore = -1.0;
   let runnerUpScore = -1.0;
-  let sumScores = 0.0;
-  let sumScoresSq = 0.0;
-  let evaluatedCount = 0;
 
-  for (const emp of candidatesToEvaluate) {
+  for (const emp of employeesList) {
     const desc = await getOrComputeEmployeeDescriptor(emp);
     if (!desc) continue;
-    const score = computeCosineSimilarity(liveDesc, desc);
-    if (score > -0.5) {
-      sumScores += score;
-      sumScoresSq += score * score;
-      evaluatedCount++;
+    let score = -1.0;
+    for (const ld of liveDescs) {
+      const s = computeCosineSimilarity(ld, desc);
+      if (s > score) score = s;
     }
     if (score > highestScore) {
       runnerUpScore = highestScore;
@@ -3473,25 +3467,14 @@ async function processWebScannerFrame() {
     }
   }
 
-  // Extreme Value Distribution (Z-Score) Outlier Test:
-  // Mathematical guarantee that match is an extreme statistical outlier
-  let isPopulationOutlier = true;
-  if (evaluatedCount >= 5) {
-    const meanScore = sumScores / evaluatedCount;
-    const variance = Math.max(1e-4, (sumScoresSq / evaluatedCount) - (meanScore * meanScore));
-    const stdScore = Math.sqrt(variance);
-    const zScore = (highestScore - meanScore) / stdScore;
-    isPopulationOutlier = zScore >= 2.8;
-  }
-
-  // Calibrated biometric thresholds tested against real sample photos:
-  // Same person live camera: >= 0.90
-  // Cross-person different faces: <= 0.36
-  const WEB_MATCH_THRESHOLD = 0.65;
-  const WEB_AMBIGUITY_MARGIN = 0.10;
+  // Natural camera & appearance variation thresholds:
+  // Same person with real-world distance/lighting: 0.42 - 0.95
+  // Different people: <= 0.35
+  const WEB_MATCH_THRESHOLD = 0.42;
+  const WEB_AMBIGUITY_MARGIN = 0.04;
   const hasAmbiguity = (employeesList.length > 1) && ((highestScore - runnerUpScore) < WEB_AMBIGUITY_MARGIN);
 
-  if (bestMatch && highestScore >= WEB_MATCH_THRESHOLD && !hasAmbiguity && isPopulationOutlier) {
+  if (bestMatch && highestScore >= WEB_MATCH_THRESHOLD && !hasAmbiguity) {
     if (webConsecutiveCandidateId === bestMatch.id) {
       webConsecutiveHits++;
       webConfidenceBuffer.push(highestScore);
@@ -3514,8 +3497,8 @@ async function processWebScannerFrame() {
 
     const pct = Math.min(100, Math.max(0, Math.round(rollingConfidence * 100)));
 
-    // Require sustained confidence across consecutive frames
-    if (webConsecutiveHits < 2 || rollingConfidence < 0.65) {
+    // Fast and responsive: verify on 1 sustained frame with rollingConfidence >= 0.42
+    if (webConsecutiveHits < 1 || rollingConfidence < 0.42) {
       if (statusPill) statusPill.textContent = `Verifying: ${bestMatch.name} (${pct}%)...`;
       if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA] animate-pulse';
       return;

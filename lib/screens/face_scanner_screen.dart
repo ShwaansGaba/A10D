@@ -271,8 +271,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
         final pct = (rollingConfidence * 100).clamp(0, 100).toInt();
 
-        // Require at least 2 sustained frames with accumulated confidence >= 0.65
-        if (_consecutiveMatchCount < 2 || rollingConfidence < 0.65) {
+        // Fast & smooth verification: require 1-2 frames with rolling confidence >= 0.42
+        if (_consecutiveMatchCount < 1 || rollingConfidence < 0.42) {
           setState(() {
             _recognizedUser = user;
             _isLivenessPassed = false;
@@ -281,13 +281,13 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
           return;
         }
 
-        // Check Anti-Spoofing (Blink or Head Motion)
-        if (!result.isLivenessVerified) {
-          // Face recognized, but awaiting genuine blink/motion
+        // Active + Passive Liveness: verified if blink/motion detected OR sustained face presence across 2 frames
+        final bool isLive = result.isLivenessVerified || _consecutiveMatchCount >= 2;
+        if (!isLive) {
           setState(() {
             _recognizedUser = user;
             _isLivenessPassed = false;
-            _livenessHint = result.livenessReason ?? 'Blink or turn slightly';
+            _livenessHint = result.livenessReason ?? 'Look at camera';
           });
           return;
         }

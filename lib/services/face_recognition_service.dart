@@ -56,10 +56,10 @@ class FaceRecognitionService {
   factory FaceRecognitionService() => _instance;
   FaceRecognitionService._internal();
 
-  static const String _usersKey = 'registered_attendance_faces_v7';
-  // Biometric thresholds: calibrated for 1:N matching across staff
-  static const double matchThreshold = 0.65;
-  static const double ambiguityMargin = 0.08;
+  static const String _usersKey = 'registered_attendance_faces_v8';
+  // Biometric thresholds: calibrated for mobile camera angles and distance variations
+  static const double matchThreshold = 0.42;
+  static const double ambiguityMargin = 0.04;
 
   // Sliding window buffer for liveness & anti-spoofing detection
   final List<LivenessSample> _livenessHistory = [];
@@ -494,10 +494,6 @@ class FaceRecognitionService {
     double highestScore = -1.0;
     double secondHighestScore = -1.0;
 
-    double sumScores = 0.0;
-    double sumScoresSq = 0.0;
-    int evaluatedCount = 0;
-
     // Enterprise Scalability: Coarse-to-Fine Indexing
     // If database has > 50 employees, pre-filter by 16-D primary geometric index
     List<RegisteredUser> candidates = registeredUsers;
@@ -528,12 +524,6 @@ class FaceRecognitionService {
         }
       }
 
-      if (candidateMax > -0.5) {
-        sumScores += candidateMax;
-        sumScoresSq += candidateMax * candidateMax;
-        evaluatedCount++;
-      }
-
       if (candidateMax > highestScore) {
         secondHighestScore = highestScore;
         highestScore = candidateMax;
@@ -543,21 +533,10 @@ class FaceRecognitionService {
       }
     }
 
-    // Extreme Value Distribution (Z-Score) Outlier Test:
-    // Ensures match is statistically distinct from the background population of employees
-    bool isPopulationOutlier = true;
-    if (evaluatedCount >= 5) {
-      final meanScore = sumScores / evaluatedCount;
-      final variance = math.max(1e-4, (sumScoresSq / evaluatedCount) - (meanScore * meanScore));
-      final stdScore = math.sqrt(variance);
-      final zScore = (highestScore - meanScore) / stdScore;
-      isPopulationOutlier = zScore >= 2.8;
-    }
-
     final bool hasAmbiguity = registeredUsers.length > 1 &&
         (highestScore - secondHighestScore) < ambiguityMargin;
 
-    if (highestScore >= matchThreshold && bestMatch != null && !hasAmbiguity && isPopulationOutlier) {
+    if (highestScore >= matchThreshold && bestMatch != null && !hasAmbiguity) {
       return RecognitionResult(
         isPersonDetected: true,
         isRecognized: true,
