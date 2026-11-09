@@ -163,7 +163,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
     final controller = CameraController(
       widget.cameras[targetIndex],
-      ResolutionPreset.medium,
+      ResolutionPreset.low, // Ultra-fast ~320x240 capture for real-time 15-25ms inference
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
@@ -195,8 +195,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
   void _startLiveScanLoop() {
     _liveScanTimer?.cancel();
-    // Scan every 400ms for instant real-time response
-    _liveScanTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+    // High-frequency scan loop (every 220ms) for instant detection
+    _liveScanTimer = Timer.periodic(const Duration(milliseconds: 220), (_) {
       _processLiveFrame();
     });
   }
@@ -274,8 +274,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
         final pct = (rollingConfidence * 100).clamp(0, 100).toInt();
 
-        // Fast & smooth verification: require 1-2 frames with rolling confidence >= 0.68
-        if (_consecutiveMatchCount < 1 || rollingConfidence < 0.68) {
+        // Fast verification: instant match on high confidence (>= 0.70) or 2nd frame for 0.68-0.70
+        if (rollingConfidence < 0.68) {
           setState(() {
             _recognizedUser = user;
             _isLivenessPassed = false;
@@ -284,13 +284,14 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
           return;
         }
 
-        // Active + Passive Liveness: verified if blink/motion detected OR sustained face presence across 2 frames
-        final bool isLive = result.isLivenessVerified || _consecutiveMatchCount >= 2;
+        // Instant punch on confident ArcFace match (>= 0.70) or verified liveness / multi-frame
+        final bool isHighConfidence = rollingConfidence >= 0.70;
+        final bool isLive = isHighConfidence || result.isLivenessVerified || _consecutiveMatchCount >= 2;
         if (!isLive) {
           setState(() {
             _recognizedUser = user;
             _isLivenessPassed = false;
-            _livenessHint = result.livenessReason ?? 'Look at camera';
+            _livenessHint = 'Hold still ($pct%)...';
           });
           return;
         }

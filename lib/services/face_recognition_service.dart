@@ -251,6 +251,36 @@ class FaceRecognitionService {
     debugPrint('FaceRecognitionService: All local face data wiped.');
   }
 
+  Future<String?> _savePhotoToDisk(String empId, String photoDataOrUrl, int index) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = 'cloud_face_${empId}_${index}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final file = File(p.join(appDir.path, fileName));
+
+      if (photoDataOrUrl.startsWith('data:image')) {
+        final commaIdx = photoDataOrUrl.indexOf(',');
+        if (commaIdx != -1) {
+          final base64Str = photoDataOrUrl.substring(commaIdx + 1);
+          final bytes = base64Decode(base64Str);
+          await file.writeAsBytes(bytes);
+          return file.path;
+        }
+      } else if (photoDataOrUrl.startsWith('http://') || photoDataOrUrl.startsWith('https://')) {
+        final client = HttpClient();
+        final request = await client.getUrl(Uri.parse(photoDataOrUrl));
+        final response = await request.close();
+        if (response.statusCode == 200) {
+          final bytes = await consolidateHttpClientResponseBytes(response);
+          await file.writeAsBytes(bytes);
+          return file.path;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error saving photo for $empId index $index: $e');
+    }
+    return null;
+  }
+
   /// Live-sync local face cache with remote employees from Supabase (Authoritative Remote Sync)
   Future<void> syncFromRemoteEmployees(List<Map<String, dynamic>> remoteEmployees) async {
     final prefs = await SharedPreferences.getInstance();
@@ -310,71 +340,60 @@ class FaceRecognitionService {
 
       String localPhotoPath = existingLocal?.photoPath ?? '';
 
-      // If embeddings are missing/mismatched or photo file doesn't exist, download photo & re-extract
-      final bool needsBiometricExtraction = parsedEmbeddings.isEmpty;
-      final bool needsPhotoDownload = localPhotoPath.isEmpty || !File(localPhotoPath).existsSync();
+      // Collect all candidate photo URLs (primary photo_url + any angle/variation photos)
+      final List<String> candidatePhotos = [];
+      final primaryPhoto = emp['photo_url'] as String?;
+      if (primaryPhoto != null && primaryPhoto.isNotEmpty) {
+        candidatePhotos.add(primaryPhoto);
+      }
 
-      final photoUrl = emp['photo_url'] as String?;
-      if ((needsBiometricExtraction || needsPhotoDownload) && photoUrl != null && photoUrl.isNotEmpty) {
-        if (photoUrl.startsWith('data:image')) {
-          try {
-            final commaIdx = photoUrl.indexOf(',');
-            if (commaIdx != -1) {
-              final base64Str = photoUrl.substring(commaIdx + 1);
-              final bytes = base64Decode(base64Str);
-              final appDir = await getApplicationDocumentsDirectory();
-              final fileName = 'cloud_face_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-              final file = File(p.join(appDir.path, fileName));
-              await file.writeAsBytes(bytes);
-              localPhotoPath = file.path;
-            }
-          } catch (e) {
-            debugPrint('Error decoding base64 photo for $name: $e');
-          }
-        } else if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
-          try {
-            final client = HttpClient();
-            final request = await client.getUrl(Uri.parse(photoUrl));
-            final response = await request.close();
-            if (response.statusCode == 200) {
-              final bytes = await consolidateHttpClientResponseBytes(response);
-              final appDir = await getApplicationDocumentsDirectory();
-              final fileName = 'cloud_face_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-              final file = File(p.join(appDir.path, fileName));
-              await file.writeAsBytes(bytes);
-              localPhotoPath = file.path;
-            }
-          } catch (e) {
-            debugPrint('Notice downloading remote face photo for $name: $e');
+      final rawEmbeddings = emp['embeddings'];
+      if (rawEmbeddings is Map && rawEmbeddings['photos'] is List) {
+        for (final pItem in rawEmbeddings['photos']) {
+          if (pItem is String && pItem.isNotEmpty && !candidatePhotos.contains(pItem)) {
+            candidatePhotos.add(pItem);
           }
         }
       }
 
-      // If we have a local photo and need 192-D biometric vector, extract it via Google ML Kit
-      if (parsedEmbeddings.isEmpty && localPhotoPath.isNotEmpty && File(localPhotoPath).existsSync()) {
-        try {
-          final extraction = await extractFaceEmbedding(localPhotoPath);
-          if (extraction != null && extraction.embedding.isNotEmpty) {
-            parsedEmbeddings = [extraction.embedding];
-            debugPrint('Biometric 192-D MobileFaceNet vector computed from photo for employee: $name');
-          }
-        } catch (e) {
-          debugPrint('MobileFaceNet photo feature extraction notice for $name: $e');
-        }
-      }
-
-      // Check if remote DB already provides native embeddings
-      if (parsedEmbeddings.isEmpty) {
-        try {
-          final rawEmbeddings = emp['embeddings'];
-          if (rawEmbeddings is List) {
-            for (final item in rawEmbeddings) {
-              if (item is List && item.length == 192) {
-                parsedEmbeddings.add(item.map((e) => (e as num).toDouble()).toList());
+      // If embeddings are missing/mismatched or photo file doesn't exist, extract from all angle photos
+      if (parsedEmbeddings.isEmpty && candidatePhotos.isNotEmpty) {
+        for (int pIdx = 0; pIdx < candidatePhotos.length; pIdx++) {
+          final photoStr = candidatePhotos[pIdx];
+          final diskPath = await _savePhotoToDisk(empId, photoStr, pIdx);
+          if (diskPath != null) {
+            if (localPhotoPath.isEmpty || !File(localPhotoPath).existsSync()) {
+              localPhotoPath = diskPath;
+            }
+            try {
+              final extraction = await extractFaceEmbedding(diskPath);
+              if (extraction != null && extraction.embedding.isNotEmpty) {
+                parsedEmbeddings.add(extraction.embedding);
+                debugPrint('Biometric 192-D MobileFaceNet angle #$pIdx extracted for $name');
               }
+            } catch (e) {
+              debugPrint('Angle photo extraction notice for $name: $e');
             }
           }
-        } catch (_) {}
+        }
+      }
+
+      // Check if remote DB already provides native 192-D embeddings directly
+      List<dynamic>? rawVecList;
+      if (rawEmbeddings is List) {
+        rawVecList = rawEmbeddings;
+      } else if (rawEmbeddings is Map && rawEmbeddings['vectors'] is List) {
+        rawVecList = rawEmbeddings['vectors'] as List;
+      }
+      if (rawVecList != null) {
+        for (final item in rawVecList) {
+          if (item is List && item.length == 192) {
+            final vec = item.map((e) => (e as num).toDouble()).toList();
+            if (!parsedEmbeddings.any((pe) => _calculateCosineSimilarity(pe, vec) > 0.98)) {
+              parsedEmbeddings.add(vec);
+            }
+          }
+        }
       }
 
       final resolvedUser = RegisteredUser(
@@ -478,7 +497,7 @@ class FaceRecognitionService {
     try {
       final file = File(imagePath);
       final bytes = await file.readAsBytes();
-      decoded = img.decodeImage(bytes);
+      decoded = img.decodeJpg(bytes) ?? img.decodeImage(bytes);
 
       if (decoded != null) {
         alignedFace = _alignAndCropFace(decoded, primaryFace);

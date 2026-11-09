@@ -1173,12 +1173,15 @@
     </div>
   </div>
 
-  <!-- 3. ADD / ENROLL EMPLOYEE MODAL (WEBCAM BIOMETRIC CAPTURE) -->
-  <div id="add-employee-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-base font-bold text-slate-900 dark:text-white">Enroll New Staff Member</h3>
-        <button onclick="closeAddEmployeeModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+  <!-- 3. ADD / ENROLL EMPLOYEE MODAL (MULTI-ANGLE & VARIATIONS BIOMETRIC CAPTURE) -->
+  <div id="add-employee-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-5">
+    <div class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 dark:text-white max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Enroll New Staff Member</h3>
+          <p class="text-[11px] text-slate-400">Add personal details and multi-angle face biometrics</p>
+        </div>
+        <button onclick="closeAddEmployeeModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
       <form onsubmit="handleCreateEmployee(event)" class="space-y-4">
@@ -1211,46 +1214,50 @@
           </div>
         </div>
 
-        <!-- Photo & Biometric Face Enrollment -->
-        <div class="border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5 bg-slate-50 dark:bg-slate-900/50">
-          <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-2">Employee Photo / Biometrics</label>
-          
-          <div id="enroll-cam-container" class="hidden mb-3">
-            <div class="relative w-full aspect-[4/3] max-w-[220px] mx-auto bg-black rounded-2xl overflow-hidden border border-[#1D93CA]">
-              <video id="enroll-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
-              <canvas id="enroll-canvas" class="hidden"></canvas>
+        <!-- Multi-Angle & Variations Biometric Enrollment -->
+        <div class="border border-slate-200 dark:border-slate-700 rounded-2xl p-4 bg-slate-50 dark:bg-slate-900/50">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <label class="block text-xs font-bold text-slate-800 dark:text-gray-200">Biometric Multi-Angle & Look Profile</label>
+              <p class="text-[11px] text-slate-400">Capture 3 sides (Front, Left, Right) + variations (With Glasses, Hair) for instant recognition</p>
             </div>
-            <div class="mt-2.5 flex justify-center space-x-2">
-              <button type="button" onclick="captureEnrollPhoto()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#FF5C7E] text-white flex items-center space-x-1 shadow-md cursor-pointer">
-                <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-                <span>Capture Face</span>
+            <!-- Bulk Upload -->
+            <div>
+              <input type="file" id="enroll-bulk-file-input" multiple accept="image/png,image/jpeg,image/webp,image/jpg" class="hidden" onchange="handleBulkSampleUpload(false, event)">
+              <button type="button" onclick="document.getElementById('enroll-bulk-file-input').click()" class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#167BB0]/10 hover:bg-[#167BB0] text-[#167BB0] hover:text-white border border-[#167BB0]/30 transition-all flex items-center space-x-1 cursor-pointer" title="Select multiple photos at once">
+                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                <span>Bulk Upload</span>
               </button>
-              <button type="button" onclick="stopEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-300 dark:bg-gray-700 text-slate-700 dark:text-gray-300 cursor-pointer">Cancel</button>
             </div>
           </div>
 
-          <div id="enroll-preview-container" class="flex items-center space-x-3.5">
-            <div id="enroll-avatar-preview" class="w-14 h-14 rounded-2xl bg-[#167BB0]/10 border-2 border-[#167BB0]/30 flex items-center justify-center text-[#167BB0] font-bold text-sm overflow-hidden shrink-0 shadow-sm">
-              <i data-lucide="user" class="w-7 h-7"></i>
+          <!-- Active Webcam Container (Shared for any slot) -->
+          <div id="enroll-cam-container" class="hidden mb-3">
+            <div class="relative w-full aspect-[4/3] max-w-[240px] mx-auto bg-black rounded-2xl overflow-hidden border-2 border-[#167BB0] shadow-md">
+              <video id="enroll-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
+              <canvas id="enroll-canvas" class="hidden"></canvas>
+              <div id="enroll-cam-slot-badge" class="absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[#167BB0] text-white">Front View</div>
             </div>
-            <div class="flex-1 space-y-1.5">
-              <!-- Upload Photo & Live Camera Buttons -->
-              <div class="flex flex-wrap items-center gap-2">
-                <input type="file" id="enroll-file-input" accept="image/png,image/jpeg,image/webp,image/jpg" class="hidden" onchange="handleEnrollFileUpload(event)">
-                <button type="button" onclick="document.getElementById('enroll-file-input').click()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#167BB0] text-white hover:bg-[#126490] flex items-center space-x-1.5 transition-all shadow-sm cursor-pointer">
-                  <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-                  <span>Upload Photo</span>
-                </button>
-                <button type="button" onclick="startEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-1.5 transition-all cursor-pointer">
-                  <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-                  <span id="enroll-btn-text">Take Live Photo</span>
-                </button>
-                <button type="button" id="enroll-remove-photo-btn" onclick="clearEnrollPhoto()" class="hidden px-2 py-1.5 rounded-xl text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer" title="Remove Photo">
-                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-              <span id="enroll-status-text" class="text-[11px] text-slate-400 block">Upload a photo (JPG/PNG) or capture live with webcam</span>
+            <div class="mt-2.5 flex justify-center space-x-2">
+              <button type="button" onclick="captureSampleFromWebcam(false)" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#FF5C7E] hover:bg-[#E04B6C] text-white flex items-center space-x-1 shadow-md cursor-pointer">
+                <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                <span id="enroll-cam-capture-label">Snap Face</span>
+              </button>
+              <button type="button" onclick="stopEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-slate-700 dark:text-gray-300 cursor-pointer">Cancel</button>
             </div>
+          </div>
+
+          <!-- Slots Container (Dynamically rendered) -->
+          <div id="enroll-sample-slots-container" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 my-2.5">
+            <!-- Populated via renderEnrollSampleSlots() -->
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <button type="button" onclick="addNewSampleSlot(false)" class="text-xs font-semibold text-[#167BB0] hover:underline flex items-center space-x-1 cursor-pointer">
+              <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+              <span>+ Add Extra Look (Glasses, Hair...)</span>
+            </button>
+            <span id="enroll-samples-counter" class="text-[11px] font-medium text-slate-400">0 / 3 angles enrolled</span>
           </div>
         </div>
 
@@ -1389,14 +1396,17 @@
   </div>
 
   <!-- 5. EDIT EMPLOYEE DETAILS & SALARY MODAL -->
-  <div id="edit-employee-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-800 dark:text-white">
-      <div class="flex items-center justify-between mb-4">
+  <div id="edit-employee-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-5">
+    <div class="bg-white dark:bg-[#151B28] border border-slate-200 dark:border-slate-700 rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl relative text-slate-800 dark:text-white max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
         <div class="flex items-center space-x-2.5">
           <div class="p-2 bg-[#167BB0]/15 rounded-xl text-[#167BB0]"><i data-lucide="user-cog" class="w-5 h-5"></i></div>
-          <h3 class="text-base font-bold text-slate-900 dark:text-white">Edit Employee Details</h3>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white">Edit Employee Details & Biometrics</h3>
+            <p class="text-[11px] text-slate-400">Update staff info and multi-angle facial recognition profiles</p>
+          </div>
         </div>
-        <button onclick="closeEditEmployeeModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button onclick="closeEditEmployeeModal()" class="text-gray-400 hover:text-slate-800 dark:hover:text-white p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
 
       <form onsubmit="handleUpdateEmployee(event)" class="space-y-4">
@@ -1431,45 +1441,50 @@
           </div>
         </div>
 
-        <!-- Edit Photo / Biometric -->
-        <div class="border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5 bg-slate-50 dark:bg-slate-900/50">
-          <label class="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-2">Employee Photo / Face</label>
-          
-          <div id="edit-enroll-cam-container" class="hidden mb-3">
-            <div class="relative w-full aspect-[4/3] max-w-[220px] mx-auto bg-black rounded-2xl overflow-hidden border border-[#1D93CA]">
-              <video id="edit-enroll-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
-              <canvas id="edit-enroll-canvas" class="hidden"></canvas>
+        <!-- Multi-Angle & Variations Biometric Enrollment (Edit) -->
+        <div class="border border-slate-200 dark:border-slate-700 rounded-2xl p-4 bg-slate-50 dark:bg-slate-900/50">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <label class="block text-xs font-bold text-slate-800 dark:text-gray-200">Biometric Multi-Angle & Look Profile</label>
+              <p class="text-[11px] text-slate-400">Add or update angles (Front, Left, Right) + looks (With Glasses, Hair) for instant 100% recognition</p>
             </div>
-            <div class="mt-2.5 flex justify-center space-x-2">
-              <button type="button" onclick="captureEditEnrollPhoto()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#FF5C7E] text-white flex items-center space-x-1 shadow-md cursor-pointer">
-                <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-                <span>Capture</span>
+            <!-- Bulk Upload -->
+            <div>
+              <input type="file" id="edit-enroll-bulk-file-input" multiple accept="image/png,image/jpeg,image/webp,image/jpg" class="hidden" onchange="handleBulkSampleUpload(true, event)">
+              <button type="button" onclick="document.getElementById('edit-enroll-bulk-file-input').click()" class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#167BB0]/10 hover:bg-[#167BB0] text-[#167BB0] hover:text-white border border-[#167BB0]/30 transition-all flex items-center space-x-1 cursor-pointer" title="Select multiple photos at once">
+                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                <span>Bulk Upload</span>
               </button>
-              <button type="button" onclick="stopEditEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-300 dark:bg-gray-700 text-slate-700 dark:text-gray-300 cursor-pointer">Cancel</button>
             </div>
           </div>
 
-          <div class="flex items-center space-x-3.5">
-            <div id="edit-emp-avatar-preview" class="w-14 h-14 rounded-2xl bg-[#167BB0]/10 border-2 border-[#167BB0]/30 flex items-center justify-center text-[#167BB0] font-bold text-sm overflow-hidden shrink-0 shadow-sm">
-              <i data-lucide="user" class="w-7 h-7"></i>
+          <!-- Active Webcam Container (Shared for any slot in edit modal) -->
+          <div id="edit-enroll-cam-container" class="hidden mb-3">
+            <div class="relative w-full aspect-[4/3] max-w-[240px] mx-auto bg-black rounded-2xl overflow-hidden border-2 border-[#167BB0] shadow-md">
+              <video id="edit-enroll-video" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
+              <canvas id="edit-enroll-canvas" class="hidden"></canvas>
+              <div id="edit-enroll-cam-slot-badge" class="absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[#167BB0] text-white">Front View</div>
             </div>
-            <div class="flex-1 space-y-1.5">
-              <div class="flex flex-wrap items-center gap-2">
-                <input type="file" id="edit-emp-file-input" accept="image/png,image/jpeg,image/webp,image/jpg" class="hidden" onchange="handleEditFileUpload(event)">
-                <button type="button" onclick="document.getElementById('edit-emp-file-input').click()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#167BB0] text-white hover:bg-[#126490] flex items-center space-x-1.5 transition-all shadow-sm cursor-pointer">
-                  <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-                  <span>Upload Photo</span>
-                </button>
-                <button type="button" onclick="startEditEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center space-x-1.5 transition-all cursor-pointer">
-                  <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-                  <span id="edit-enroll-btn-text">Live Photo</span>
-                </button>
-                <button type="button" id="edit-remove-photo-btn" onclick="clearEditEnrollPhoto()" class="hidden px-2 py-1.5 rounded-xl text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer" title="Remove Photo">
-                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-              <span id="edit-enroll-status-text" class="text-[11px] text-slate-400 block">Change photo or leave as-is</span>
+            <div class="mt-2.5 flex justify-center space-x-2">
+              <button type="button" onclick="captureSampleFromWebcam(true)" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#FF5C7E] hover:bg-[#E04B6C] text-white flex items-center space-x-1 shadow-md cursor-pointer">
+                <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                <span id="edit-enroll-cam-capture-label">Snap Face</span>
+              </button>
+              <button type="button" onclick="stopEditEnrollCamera()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-slate-700 dark:text-gray-300 cursor-pointer">Cancel</button>
             </div>
+          </div>
+
+          <!-- Slots Container (Dynamically rendered) -->
+          <div id="edit-enroll-sample-slots-container" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 my-2.5">
+            <!-- Populated via renderEditSampleSlots() -->
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <button type="button" onclick="addNewSampleSlot(true)" class="text-xs font-semibold text-[#167BB0] hover:underline flex items-center space-x-1 cursor-pointer">
+              <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+              <span>+ Add Extra Look (Glasses, Hair...)</span>
+            </button>
+            <span id="edit-enroll-samples-counter" class="text-[11px] font-medium text-slate-400">0 angles enrolled</span>
           </div>
         </div>
 
@@ -1709,7 +1724,7 @@ ALTER TABLE public.kiosks DISABLE ROW LEVEL SECURITY;</pre>
     try { localStorage.removeItem('a10d_deleted_accounts'); } catch (_) {}
   </script>
   <!-- Load Config and App Scripts -->
-  <script src="supabase-config.js?v=8.1"></script>
-  <script src="app.js?v=8.1"></script>
+  <script src="supabase-config.js?v=8.2"></script>
+  <script src="app.js?v=8.2"></script>
 </body>
 </html>

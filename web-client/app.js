@@ -136,6 +136,12 @@ window.clearEnrollPhoto = clearEnrollPhoto;
 window.startEnrollCamera = startEnrollCamera;
 window.stopEnrollCamera = stopEnrollCamera;
 window.captureEnrollPhoto = captureEnrollPhoto;
+window.handleBulkSampleUpload = handleBulkSampleUpload;
+window.captureSampleFromWebcam = captureSampleFromWebcam;
+window.addNewSampleSlot = addNewSampleSlot;
+window.removeSampleSlot = removeSampleSlot;
+window.startSlotCamera = startSlotCamera;
+window.handleSlotFileUpload = handleSlotFileUpload;
 window.setEmployeeViewMode = setEmployeeViewMode;
 window.openEmployeeAttendanceModal = openEmployeeAttendanceModal;
 window.closeEmployeeAttendanceModal = closeEmployeeAttendanceModal;
@@ -3334,84 +3340,133 @@ if (typeof window !== 'undefined') {
   });
 }
 
-async function getOrComputeEmployeeDescriptor(emp) {
-  if (!emp) return null;
+async function computeFaceApiDescriptorFromUrl(photoUrl) {
+  if (!photoUrl) return null;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = async () => {
+      try {
+        let detection = await faceapi
+          .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.20 }))
+          .withFaceLandmarks(true)
+          .withFaceDescriptor();
+
+        if (detection && detection.descriptor) {
+          resolve(detection.descriptor);
+          return;
+        }
+
+        // Try on cropped face canvas
+        const faceCanvas = await detectAndCropFaceFromImage(img);
+        let detectionFallback = await faceapi
+          .detectSingleFace(faceCanvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.12 }))
+          .withFaceLandmarks(true)
+          .withFaceDescriptor();
+
+        if (detectionFallback && detectionFallback.descriptor) {
+          resolve(detectionFallback.descriptor);
+          return;
+        }
+      } catch (_) {}
+      resolve(null);
+    };
+    img.onerror = () => resolve(null);
+    img.src = photoUrl;
+  });
+}
+
+async function getOrComputeEmployeeDescriptors(emp) {
+  if (!emp) return [];
   if (employeeDescriptorCache.has(emp.id)) {
     return employeeDescriptorCache.get(emp.id);
   }
 
-  // 1. If Face-API is available, extract 128-D ResNet deep embedding
-  if (typeof faceapi !== 'undefined' && emp.photo_url) {
+  const descriptors = [];
+
+  // 1. Direct vectors from emp.embeddings (if already precomputed 128-D)
+  if (emp.embeddings) {
+    let rawVecs = [];
+    if (Array.isArray(emp.embeddings)) {
+      rawVecs = emp.embeddings;
+    } else if (emp.embeddings && typeof emp.embeddings === 'object' && Array.isArray(emp.embeddings.vectors)) {
+      rawVecs = emp.embeddings.vectors;
+    }
+    for (const v of rawVecs) {
+      if (Array.isArray(v) && v.length === 128) {
+        descriptors.push(new Float32Array(v));
+      }
+    }
+  }
+
+  // 2. All candidate photo URLs (emp.photo_url + emp.embeddings.photos)
+  const candidatePhotos = [];
+  if (emp.photo_url && !candidatePhotos.includes(emp.photo_url)) {
+    candidatePhotos.push(emp.photo_url);
+  }
+  if (emp.embeddings && typeof emp.embeddings === 'object' && Array.isArray(emp.embeddings.photos)) {
+    for (const p of emp.embeddings.photos) {
+      if (p && !candidatePhotos.includes(p)) candidatePhotos.push(p);
+    }
+  }
+
+  // 3. For any photos that don't have matching vectors, compute them via face-api
+  if (typeof faceapi !== 'undefined') {
     if (!isFaceApiReady && !faceApiLoading) {
       await ensureFaceApiReady();
     }
     if (isFaceApiReady) {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = async () => {
-          try {
-            const detection = await faceapi
-              .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.25 }))
-              .withFaceLandmarks(true)
-              .withFaceDescriptor();
-
-            if (detection && detection.descriptor) {
-              employeeDescriptorCache.set(emp.id, detection.descriptor);
-              resolve(detection.descriptor);
-              return;
+      for (const photoUrl of candidatePhotos) {
+        try {
+          const desc = await computeFaceApiDescriptorFromUrl(photoUrl);
+          if (desc && desc.length === 128) {
+            const exists = descriptors.some(existing => faceapi.euclideanDistance(existing, desc) < 0.08);
+            if (!exists) {
+              descriptors.push(desc);
             }
-
-            // Fallback: detect face on cropped canvas
-            const faceCanvas = await detectAndCropFaceFromImage(img);
-            const detectionFallback = await faceapi
-              .detectSingleFace(faceCanvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 }))
-              .withFaceLandmarks(true)
-              .withFaceDescriptor();
-
-            if (detectionFallback && detectionFallback.descriptor) {
-              employeeDescriptorCache.set(emp.id, detectionFallback.descriptor);
-              resolve(detectionFallback.descriptor);
-              return;
-            }
-          } catch (_) {}
-
-          // Fallback to visual feature vector
-          const faceCanvas = await detectAndCropFaceFromImage(img);
-          const desc = extractFacialFeatureVector(faceCanvas);
-          employeeDescriptorCache.set(emp.id, desc);
-          resolve(desc);
-        };
-        img.onerror = () => resolve(null);
-        img.src = emp.photo_url;
-      });
+          }
+        } catch (_) {}
+      }
     }
   }
 
-  // Fallback if face-api not loaded
-  if (emp.photo_url) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = async () => {
-        const faceCanvas = await detectAndCropFaceFromImage(img);
-        const desc = extractFacialFeatureVector(faceCanvas);
-        employeeDescriptorCache.set(emp.id, desc);
-        resolve(desc);
-      };
-      img.onerror = () => resolve(null);
-      img.src = emp.photo_url;
-    });
+  // 4. Fallback visual descriptors if faceapi not loaded
+  if (descriptors.length === 0 && candidatePhotos.length > 0) {
+    for (const photoUrl of candidatePhotos) {
+      try {
+        const img = await new Promise((res) => {
+          const i = new Image();
+          i.crossOrigin = 'anonymous';
+          i.onload = () => res(i);
+          i.onerror = () => res(null);
+          i.src = photoUrl;
+        });
+        if (img) {
+          const faceCanvas = await detectAndCropFaceFromImage(img);
+          const visualDesc = extractFacialFeatureVector(faceCanvas);
+          if (visualDesc) descriptors.push(visualDesc);
+        }
+      } catch (_) {}
+    }
   }
 
-  return null;
+  if (descriptors.length > 0) {
+    employeeDescriptorCache.set(emp.id, descriptors);
+  }
+  return descriptors;
+}
+
+// Backward-compatible single descriptor getter
+async function getOrComputeEmployeeDescriptor(emp) {
+  const descs = await getOrComputeEmployeeDescriptors(emp);
+  return descs && descs.length > 0 ? descs[0] : null;
 }
 
 async function cacheAllEmployeeDescriptors(list) {
   if (!list || !Array.isArray(list)) return;
   for (const emp of list) {
-    if (!employeeDescriptorCache.has(emp.id) && emp.photo_url) {
-      await getOrComputeEmployeeDescriptor(emp);
+    if (!employeeDescriptorCache.has(emp.id) && (emp.photo_url || emp.embeddings)) {
+      await getOrComputeEmployeeDescriptors(emp);
     }
   }
 }
@@ -3445,7 +3500,7 @@ async function processWebScannerFrame() {
     let detection = null;
     try {
       detection = await faceapi
-        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.45 }))
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.35 }))
         .withFaceLandmarks(true)
         .withFaceDescriptor();
     } catch (_) {}
@@ -3463,22 +3518,28 @@ async function processWebScannerFrame() {
     let runnerUpDistance = 999.0;
 
     for (const emp of employeesList) {
-      const desc = await getOrComputeEmployeeDescriptor(emp);
-      if (!desc || desc.length !== 128) continue;
-      const dist = faceapi.euclideanDistance(liveDesc, desc);
-      if (dist < minDistance) {
+      const descs = await getOrComputeEmployeeDescriptors(emp);
+      if (!descs || descs.length === 0) continue;
+
+      let empMinDist = 999.0;
+      for (const d of descs) {
+        if (!d || d.length !== 128) continue;
+        const dist = faceapi.euclideanDistance(liveDesc, d);
+        if (dist < empMinDist) empMinDist = dist;
+      }
+
+      if (empMinDist < minDistance) {
         runnerUpDistance = minDistance;
-        minDistance = dist;
+        minDistance = empMinDist;
         bestMatch = emp;
-      } else if (dist < runnerUpDistance) {
-        runnerUpDistance = dist;
+      } else if (empMinDist < runnerUpDistance) {
+        runnerUpDistance = empMinDist;
       }
     }
 
-    // ResNet-34 Euclidean Distance:
-    // Same person: 0.15 - 0.45
-    // Different person: > 0.60
-    const MATCH_DISTANCE_THRESHOLD = 0.48;
+    // ResNet-34 Euclidean Distance with Multi-Angle Representations:
+    // With 3-5 views (front, left, right, glasses, hair), threshold 0.52 gives instant recognition
+    const MATCH_DISTANCE_THRESHOLD = 0.52;
     const AMBIGUITY_DISTANCE_MARGIN = 0.05;
     const isDistinctMatch = bestMatch != null &&
       minDistance <= MATCH_DISTANCE_THRESHOLD &&
@@ -3493,7 +3554,8 @@ async function processWebScannerFrame() {
         webConsecutiveHits = 1;
       }
 
-      if (webConsecutiveHits < 2) {
+      // Instant punch on high-confidence match (<= 0.44) or 2nd frame for 0.44 - 0.52
+      if (minDistance > 0.44 && webConsecutiveHits < 2) {
         if (statusPill) statusPill.textContent = `Verifying: ${bestMatch.name} (${confidencePct}%)...`;
         if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-[#1D93CA] animate-pulse';
         return;
@@ -3834,138 +3896,343 @@ function stopEnrollCamera() {
     enrollStream.getTracks().forEach(t => t.stop());
     enrollStream = null;
   }
-  const container = document.getElementById('enroll-cam-container');
-  const btnText = document.getElementById('enroll-btn-text');
-  if (container) container.classList.add('hidden');
-  if (btnText) btnText.textContent = capturedEnrollPhoto ? 'Retake Photo' : 'Take Live Photo';
+  const addCam = document.getElementById('enroll-cam-container');
+  const editCam = document.getElementById('edit-enroll-cam-container');
+  if (addCam) addCam.classList.add('hidden');
+  if (editCam) editCam.classList.add('hidden');
 }
 
-function captureEnrollPhoto() {
-  const video = document.getElementById('enroll-video');
-  const canvas = document.getElementById('enroll-canvas');
-  const avatarPreview = document.getElementById('enroll-avatar-preview');
-  const statusText = document.getElementById('enroll-status-text');
-  const removeBtn = document.getElementById('enroll-remove-photo-btn');
+// Multi-Sample Biometric Enrollment State
+let enrollSamples = [
+  { id: 'front', label: 'Front View', required: true, photo: null, descriptor: null },
+  { id: 'left', label: 'Left Profile (~30°)', required: false, photo: null, descriptor: null },
+  { id: 'right', label: 'Right Profile (~30°)', required: false, photo: null, descriptor: null },
+];
+let editEnrollSamples = [];
+let activeCamSlot = { isEdit: false, slotId: 'front' };
 
+function initEnrollSampleSlots() {
+  enrollSamples = [
+    { id: 'front', label: 'Front View', required: true, photo: null, descriptor: null },
+    { id: 'left', label: 'Left Profile (~30°)', required: false, photo: null, descriptor: null },
+    { id: 'right', label: 'Right Profile (~30°)', required: false, photo: null, descriptor: null },
+  ];
+  capturedEnrollPhoto = null;
+  capturedEnrollEmbedding = null;
+  renderSampleSlots(false);
+}
+
+function initEditSampleSlots(emp) {
+  editEnrollSamples = [
+    { id: 'front', label: 'Front View', required: true, photo: emp.photo_url || null, descriptor: null },
+    { id: 'left', label: 'Left Profile (~30°)', required: false, photo: null, descriptor: null },
+    { id: 'right', label: 'Right Profile (~30°)', required: false, photo: null, descriptor: null },
+  ];
+
+  if (emp.embeddings && typeof emp.embeddings === 'object' && Array.isArray(emp.embeddings.photos)) {
+    emp.embeddings.photos.forEach((photoUrl, idx) => {
+      const label = (Array.isArray(emp.embeddings.labels) && emp.embeddings.labels[idx])
+        ? emp.embeddings.labels[idx]
+        : (idx === 0 ? 'Front View' : (idx === 1 ? 'Left Profile (~30°)' : (idx === 2 ? 'Right Profile (~30°)' : `Look ${idx + 1}`)));
+      const vec = (Array.isArray(emp.embeddings.vectors) && emp.embeddings.vectors[idx])
+        ? emp.embeddings.vectors[idx]
+        : null;
+
+      if (idx < editEnrollSamples.length) {
+        editEnrollSamples[idx].photo = photoUrl;
+        editEnrollSamples[idx].label = label;
+        editEnrollSamples[idx].descriptor = vec;
+      } else {
+        editEnrollSamples.push({
+          id: 'sample_' + Date.now() + '_' + idx,
+          label: label,
+          required: false,
+          photo: photoUrl,
+          descriptor: vec,
+        });
+      }
+    });
+  }
+
+  renderSampleSlots(true);
+}
+
+function renderSampleSlots(isEdit) {
+  const container = document.getElementById(isEdit ? 'edit-enroll-sample-slots-container' : 'enroll-sample-slots-container');
+  const counterEl = document.getElementById(isEdit ? 'edit-enroll-samples-counter' : 'enroll-samples-counter');
+  if (!container) return;
+
+  const samples = isEdit ? editEnrollSamples : enrollSamples;
+  const enrolledCount = samples.filter(s => s.photo).length;
+  if (counterEl) {
+    counterEl.textContent = `${enrolledCount} / ${samples.length} angle(s) enrolled`;
+  }
+
+  // Sync primary photo for backward-compatible previews
+  const primary = samples.find(s => s.photo);
+  if (!isEdit) {
+    capturedEnrollPhoto = primary ? primary.photo : null;
+  } else {
+    capturedEditPhoto = primary ? primary.photo : null;
+  }
+
+  container.innerHTML = samples.map((slot, idx) => {
+    const hasPhoto = !!slot.photo;
+    return `
+      <div class="relative flex flex-col items-center justify-between p-2.5 rounded-2xl border ${hasPhoto ? 'border-emerald-500/50 bg-emerald-50/20 dark:bg-emerald-950/20' : 'border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/50'} text-center transition-all group">
+        <div class="w-full flex items-center justify-between mb-1.5 px-0.5">
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${hasPhoto ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'} truncate max-w-[80%]" title="${escapeHtml(slot.label)}">
+            ${escapeHtml(slot.label)}
+          </span>
+          ${!slot.required && samples.length > 3 ? `
+            <button type="button" onclick="removeSampleSlot(${isEdit}, '${slot.id}')" class="text-slate-400 hover:text-rose-500 transition-colors p-0.5 cursor-pointer" title="Remove this look">
+              <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
+          ` : ''}
+        </div>
+
+        <div class="relative w-16 h-16 rounded-xl overflow-hidden mb-2 bg-slate-100 dark:bg-slate-900 border ${hasPhoto ? 'border-emerald-500 shadow-xs' : 'border-slate-200 dark:border-slate-700'} flex items-center justify-center">
+          ${hasPhoto ? `
+            <img src="${slot.photo}" class="w-full h-full object-cover">
+            <span class="absolute bottom-0 inset-x-0 bg-emerald-600/90 text-white text-[9px] font-extrabold py-0.5 text-center leading-none">✓ OK</span>
+          ` : `
+            <i data-lucide="camera" class="w-6 h-6 text-slate-300 dark:text-slate-600"></i>
+          `}
+        </div>
+
+        <div class="flex items-center space-x-1.5 w-full">
+          <input type="file" id="slot-file-${isEdit ? 'edit-' : ''}${slot.id}" accept="image/png,image/jpeg,image/webp,image/jpg" class="hidden" onchange="handleSlotFileUpload(${isEdit}, '${slot.id}', event)">
+          <button type="button" onclick="document.getElementById('slot-file-${isEdit ? 'edit-' : ''}${slot.id}').click()" class="flex-1 py-1 rounded-lg text-[10px] font-bold bg-[#167BB0]/10 hover:bg-[#167BB0] text-[#167BB0] hover:text-white transition-all cursor-pointer flex items-center justify-center space-x-0.5" title="Upload Photo">
+            <i data-lucide="upload" class="w-2.5 h-2.5"></i>
+            <span>${hasPhoto ? 'Change' : 'File'}</span>
+          </button>
+          <button type="button" onclick="startSlotCamera(${isEdit}, '${slot.id}')" class="flex-1 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-700 hover:bg-[#FF5C7E] text-slate-700 dark:text-slate-200 hover:text-white transition-all cursor-pointer flex items-center justify-center space-x-0.5" title="Capture with Webcam">
+            <i data-lucide="camera" class="w-2.5 h-2.5"></i>
+            <span>Snap</span>
+          </button>
+          ${hasPhoto ? `
+            <button type="button" onclick="clearSampleSlot(${isEdit}, '${slot.id}')" class="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer" title="Clear photo">
+              <i data-lucide="trash-2" class="w-2.5 h-2.5"></i>
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  safeCreateIcons();
+}
+
+function addNewSampleSlot(isEdit, customLabel) {
+  const samples = isEdit ? editEnrollSamples : enrollSamples;
+  const label = customLabel || prompt('Enter label for new look (e.g. "With Glasses", "Alternate Hair", "Look 4"):', 'With Glasses');
+  if (!label) return;
+
+  samples.push({
+    id: 'sample_' + Date.now(),
+    label: label.trim(),
+    required: false,
+    photo: null,
+    descriptor: null,
+  });
+
+  renderSampleSlots(isEdit);
+}
+
+function removeSampleSlot(isEdit, slotId) {
+  let samples = isEdit ? editEnrollSamples : enrollSamples;
+  const idx = samples.findIndex(s => s.id === slotId);
+  if (idx !== -1) {
+    samples.splice(idx, 1);
+    renderSampleSlots(isEdit);
+  }
+}
+
+function clearSampleSlot(isEdit, slotId) {
+  const samples = isEdit ? editEnrollSamples : enrollSamples;
+  const slot = samples.find(s => s.id === slotId);
+  if (slot) {
+    slot.photo = null;
+    slot.descriptor = null;
+    renderSampleSlots(isEdit);
+  }
+}
+
+async function extractBiometricsFromDataUrl(dataUrl) {
+  // If Face-API is available, extract 128-D ResNet deep descriptor
+  if (typeof faceapi !== 'undefined' && isFaceApiReady) {
+    try {
+      const desc = await computeFaceApiDescriptorFromUrl(dataUrl);
+      if (desc && desc.length === 128) {
+        return Array.from(desc);
+      }
+    } catch (_) {}
+  }
+  // Fallback to high-precision visual geometry vector
+  try {
+    const img = await new Promise((res) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => res(null);
+      i.src = dataUrl;
+    });
+    if (img) {
+      const faceCanvas = await detectAndCropFaceFromImage(img);
+      return extractFacialFeatureVector(faceCanvas);
+    }
+  } catch (_) {}
+  return null;
+}
+
+async function handleSlotFileUpload(isEdit, slotId, e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(evt) {
+    const img = new Image();
+    img.onload = async function() {
+      const faceCanvas = await detectAndCropFaceFromImage(img);
+      const photoData = faceCanvas.toDataURL('image/jpeg', 0.90);
+      const desc = await extractBiometricsFromDataUrl(photoData);
+
+      const samples = isEdit ? editEnrollSamples : enrollSamples;
+      const slot = samples.find(s => s.id === slotId);
+      if (slot) {
+        slot.photo = photoData;
+        slot.descriptor = desc;
+      }
+
+      renderSampleSlots(isEdit);
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function handleBulkSampleUpload(isEdit, e) {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  const samples = isEdit ? editEnrollSamples : enrollSamples;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const img = new Image();
+        img.onload = async () => {
+          const faceCanvas = await detectAndCropFaceFromImage(img);
+          const photoData = faceCanvas.toDataURL('image/jpeg', 0.90);
+          const desc = await extractBiometricsFromDataUrl(photoData);
+
+          // Find first unfilled slot, or add new slot
+          let targetSlot = samples.find(s => !s.photo);
+          if (!targetSlot) {
+            const newLabel = i === 3 ? 'With Glasses' : (i === 4 ? 'Changed Hair' : `Angle ${samples.length + 1}`);
+            targetSlot = {
+              id: 'bulk_' + Date.now() + '_' + i,
+              label: newLabel,
+              required: false,
+              photo: null,
+              descriptor: null,
+            };
+            samples.push(targetSlot);
+          }
+
+          targetSlot.photo = photoData;
+          targetSlot.descriptor = desc;
+          resolve();
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  renderSampleSlots(isEdit);
+  showAppToast(`Loaded ${files.length} angle photos successfully!`);
+}
+
+async function startSlotCamera(isEdit, slotId) {
+  stopEnrollCamera();
+  activeCamSlot = { isEdit, slotId };
+
+  const containerId = isEdit ? 'edit-enroll-cam-container' : 'enroll-cam-container';
+  const videoId = isEdit ? 'edit-enroll-video' : 'enroll-video';
+  const badgeId = isEdit ? 'edit-enroll-cam-slot-badge' : 'enroll-cam-slot-badge';
+
+  const container = document.getElementById(containerId);
+  const video = document.getElementById(videoId);
+  const badge = document.getElementById(badgeId);
+
+  const samples = isEdit ? editEnrollSamples : enrollSamples;
+  const slot = samples.find(s => s.id === slotId);
+
+  if (badge && slot) badge.textContent = `Capturing: ${slot.label}`;
+  if (!container || !video) return;
+
+  try {
+    enrollStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 320, height: 240, facingMode: 'user' },
+      audio: false
+    });
+    video.srcObject = enrollStream;
+    container.classList.remove('hidden');
+    safeCreateIcons();
+  } catch (err) {
+    alert('Webcam permission needed for face enrollment: ' + err.message);
+  }
+}
+
+async function captureSampleFromWebcam(isEdit) {
+  const videoId = isEdit ? 'edit-enroll-video' : 'enroll-video';
+  const canvasId = isEdit ? 'edit-enroll-canvas' : 'enroll-canvas';
+
+  const video = document.getElementById(videoId);
+  const canvas = document.getElementById(canvasId);
   if (!video || !canvas) return;
 
   canvas.width = 160;
   canvas.height = 160;
   const ctx = canvas.getContext('2d');
-  
-  // Crop center square
   const minDim = Math.min(video.videoWidth || 320, video.videoHeight || 240);
   const sx = ((video.videoWidth || 320) - minDim) / 2;
   const sy = ((video.videoHeight || 240) - minDim) / 2;
 
   ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 160, 160);
-  capturedEnrollPhoto = canvas.toDataURL('image/jpeg', 0.85);
+  const photoData = canvas.toDataURL('image/jpeg', 0.88);
+  const desc = await extractBiometricsFromDataUrl(photoData);
 
-  // Extract real high-precision biometric visual descriptor
-  const realDescriptor = extractFacialFeatureVector(canvas);
-  capturedEnrollEmbedding = [realDescriptor, realDescriptor, realDescriptor];
-
-  if (avatarPreview) {
-    avatarPreview.innerHTML = `<img src="${capturedEnrollPhoto}" class="w-full h-full object-cover">`;
-  }
-  if (statusText) {
-    statusText.textContent = '✓ Live face photo captured';
-    statusText.className = 'text-[11px] text-green-500 font-semibold block';
-  }
-  if (removeBtn) {
-    removeBtn.classList.remove('hidden');
+  const samples = isEdit ? editEnrollSamples : enrollSamples;
+  const slot = samples.find(s => s.id === activeCamSlot.slotId);
+  if (slot) {
+    slot.photo = photoData;
+    slot.descriptor = desc;
   }
 
   stopEnrollCamera();
-  safeCreateIcons();
+  renderSampleSlots(isEdit);
+
+  // If there's an unfilled next angle in the standard 3, automatically prompt to snap next!
+  const nextUnfilled = samples.find(s => !s.photo);
+  if (nextUnfilled) {
+    setTimeout(() => {
+      startSlotCamera(isEdit, nextUnfilled.id);
+    }, 400);
+  }
 }
 
-// Handle Photo File Upload (PNG / JPG / WEBP)
-function handleEnrollFileUpload(e) {
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
-
-  if (!file.type.startsWith('image/')) {
-    alert('Please select a valid image file (PNG, JPG, JPEG, WEBP).');
-    return;
-  }
-
-  stopEnrollCamera();
-
-  const reader = new FileReader();
-  reader.onload = function(event) {
-    const img = new Image();
-    img.onload = async function() {
-      const avatarPreview = document.getElementById('enroll-avatar-preview');
-      const statusText = document.getElementById('enroll-status-text');
-      const removeBtn = document.getElementById('enroll-remove-photo-btn');
-      const btnText = document.getElementById('enroll-btn-text');
-
-      if (statusText) {
-        statusText.textContent = 'Detecting facial features from uploaded photo...';
-        statusText.className = 'text-[11px] text-[#1D93CA] font-semibold block animate-pulse';
-      }
-
-      // Automatically locate and crop face from uploaded photo
-      const faceCanvas = await detectAndCropFaceFromImage(img);
-      capturedEnrollPhoto = faceCanvas.toDataURL('image/jpeg', 0.90);
-
-      // Extract real biometric visual descriptor directly from the cropped face
-      const realDescriptor = extractFacialFeatureVector(faceCanvas);
-      capturedEnrollEmbedding = [realDescriptor, realDescriptor, realDescriptor];
-
-      if (avatarPreview) {
-        avatarPreview.innerHTML = `<img src="${capturedEnrollPhoto}" class="w-full h-full object-cover">`;
-      }
-      if (statusText) {
-        statusText.textContent = `✓ Biometric face detected & registered: ${file.name}`;
-        statusText.className = 'text-[11px] text-emerald-600 font-semibold block';
-      }
-      if (removeBtn) {
-        removeBtn.classList.remove('hidden');
-      }
-      if (btnText) {
-        btnText.textContent = 'Retake Live Photo';
-      }
-      safeCreateIcons();
-    };
-    img.onerror = function() {
-      alert('Could not decode the selected image file. Please try another photo.');
-    };
-    img.src = event.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-// Clear or Remove Enrolled Photo
-function clearEnrollPhoto() {
-  capturedEnrollPhoto = null;
-  capturedEnrollEmbedding = null;
-
-  const fileInput = document.getElementById('enroll-file-input');
-  if (fileInput) fileInput.value = '';
-
-  const avatarPreview = document.getElementById('enroll-avatar-preview');
-  const statusText = document.getElementById('enroll-status-text');
-  const removeBtn = document.getElementById('enroll-remove-photo-btn');
-  const btnText = document.getElementById('enroll-btn-text');
-
-  if (avatarPreview) {
-    avatarPreview.innerHTML = '<i data-lucide="user" class="w-7 h-7"></i>';
-  }
-  if (statusText) {
-    statusText.textContent = 'Upload a photo (JPG/PNG) or capture live with webcam';
-    statusText.className = 'text-[11px] text-slate-400 block';
-  }
-  if (removeBtn) {
-    removeBtn.classList.add('hidden');
-  }
-  if (btnText) {
-    btnText.textContent = 'Take Live Photo';
-  }
-  stopEnrollCamera();
-  safeCreateIcons();
-}
+// Backward-compatible webcam wrappers
+function captureEnrollPhoto() { captureSampleFromWebcam(false); }
+function captureEditEnrollPhoto() { captureSampleFromWebcam(true); }
+function handleEnrollFileUpload(e) { handleSlotFileUpload(false, 'front', e); }
+function handleEditFileUpload(e) { handleSlotFileUpload(true, 'front', e); }
+function clearEnrollPhoto() { clearSampleSlot(false, 'front'); }
+function clearEditEnrollPhoto() { clearSampleSlot(true, 'front'); }
+function startEnrollCamera() { startSlotCamera(false, 'front'); }
+function startEditEnrollCamera() { startSlotCamera(true, 'front'); }
 
 // Set Live Feed Date Mode ('today' or 'all')
 function setLiveFeedDate(mode) {
@@ -4390,6 +4657,7 @@ function handleSaveConfig(e) {
 function openAddEmployeeModal() {
   capturedEnrollPhoto = null;
   capturedEnrollEmbedding = null;
+  initEnrollSampleSlots();
   const nameInput = document.getElementById('new-emp-name');
   if (nameInput) nameInput.value = '';
   const phoneInput = document.getElementById('new-emp-phone');
@@ -4441,13 +4709,22 @@ async function handleCreateEmployee(e) {
   }
 
   try {
+    const validSamples = enrollSamples.filter(s => s.photo);
+    const primaryPhoto = validSamples.length > 0 ? validSamples[0].photo : (capturedEnrollPhoto || null);
+    const vectors = validSamples.map(s => s.descriptor).filter(Boolean);
+    const photos = validSamples.map(s => s.photo);
+    const labels = validSamples.map(s => s.label);
+    const multiAngleEmbeddings = (vectors.length > 0 || photos.length > 0)
+      ? { vectors, photos, labels }
+      : (capturedEnrollEmbedding || null);
+
     const newRecord = {
       name,
       employee_code: code || null,
       department: dept || 'General',
       salary: salary,
-      photo_url: capturedEnrollPhoto || null,
-      embeddings: capturedEnrollEmbedding || null,
+      photo_url: primaryPhoto,
+      embeddings: multiAngleEmbeddings,
       is_active: true,
     };
     if (phone) {
@@ -4681,6 +4958,7 @@ function openEditEmployeeModal(empId) {
 
   capturedEditPhoto = undefined;
   capturedEditEmbedding = undefined;
+  initEditSampleSlots(emp);
 
   document.getElementById('edit-emp-id').value = emp.id;
   document.getElementById('edit-emp-name').value = emp.name || '';
@@ -4879,6 +5157,20 @@ async function handleUpdateEmployee(e) {
       payload.embeddings = capturedEditEmbedding;
     }
 
+    if (editEnrollSamples && editEnrollSamples.length > 0) {
+      const validSamples = editEnrollSamples.filter(s => s.photo);
+      if (validSamples.length > 0) {
+        payload.photo_url = validSamples[0].photo;
+        const vectors = validSamples.map(s => s.descriptor).filter(Boolean);
+        const photos = validSamples.map(s => s.photo);
+        const labels = validSamples.map(s => s.label);
+        payload.embeddings = { vectors, photos, labels };
+      } else {
+        payload.photo_url = null;
+        payload.embeddings = null;
+      }
+    }
+
     if (supabaseClient) {
       const { data, error } = await supabaseClient
         .from('employees')
@@ -4907,8 +5199,8 @@ async function handleUpdateEmployee(e) {
       targetEmp.employee_code = code || null;
       targetEmp.department = dept || 'General';
       targetEmp.salary = salary;
-      if (capturedEditPhoto !== undefined) targetEmp.photo_url = capturedEditPhoto;
-      if (capturedEditEmbedding !== undefined) targetEmp.embeddings = capturedEditEmbedding;
+      if (payload.photo_url !== undefined) targetEmp.photo_url = payload.photo_url;
+      if (payload.embeddings !== undefined) targetEmp.embeddings = payload.embeddings;
       employeeDescriptorCache.delete(empId);
     }
 

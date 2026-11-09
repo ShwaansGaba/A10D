@@ -37,11 +37,15 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
     },
     {
       'title': 'Left Angle',
-      'instruction': 'Turn your head slightly to the left',
+      'instruction': 'Turn your head slightly to the left (~30°)',
     },
     {
       'title': 'Right Angle',
-      'instruction': 'Turn your head slightly to the right',
+      'instruction': 'Turn your head slightly to the right (~30°)',
+    },
+    {
+      'title': 'With Glasses / Alternate Hair',
+      'instruction': 'Wear glasses or alternate look, or tap Finish Now below',
     },
   ];
 
@@ -170,7 +174,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
         _mainCroppedPath = extraction.croppedPath;
       }
 
-      if (_capturedEmbeddings.length < 3) {
+      if (_capturedEmbeddings.length < _stepsMeta.length) {
         setState(() {
           _currentStep++;
         });
@@ -498,37 +502,60 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
               ),
             ),
 
-            // Bottom Capture Button
+            // Bottom Capture / Skip Buttons
             Positioned(
-              bottom: 28,
-              left: 24,
-              right: 24,
-              child: SizedBox(
-                height: 56,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.cyanAccent,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 5,
+              bottom: 24,
+              left: 20,
+              right: 20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 52,
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.cyanAccent,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 5,
+                      ),
+                      onPressed: (_isCameraInitialized && !_isProcessing)
+                          ? _captureCurrentView
+                          : null,
+                      icon: _isProcessing
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                            )
+                          : const Icon(Icons.camera_alt_rounded, size: 24),
+                      label: Text(
+                        _isProcessing
+                            ? 'Analyzing ${currentMeta['title']}...'
+                            : 'Capture ${currentMeta['title']} (${_currentStep + 1}/${_stepsMeta.length})',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
                   ),
-                  onPressed: (_isCameraInitialized && !_isProcessing)
-                      ? _captureCurrentView
-                      : null,
-                  icon: _isProcessing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                        )
-                      : const Icon(Icons.camera_alt_rounded, size: 24),
-                  label: Text(
-                    _isProcessing
-                        ? 'Analyzing ${currentMeta['title']}...'
-                        : 'Capture ${currentMeta['title']} (${_currentStep + 1}/3)',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                ),
+                  if (_currentStep >= 3) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 42,
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          backgroundColor: Colors.white10,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: !_isProcessing ? _promptForEmployeeName : null,
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text('Finish & Save (Skip Glasses / Hair)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
