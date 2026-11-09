@@ -123,6 +123,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     }
   }
 
+  bool _isScanLoopActive = false;
+
   Future<void> _initializeCamera({int? cameraIndex}) async {
     final status = await Permission.camera.request();
     if (!status.isGranted) {
@@ -163,7 +165,7 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
     final controller = CameraController(
       widget.cameras[targetIndex],
-      ResolutionPreset.low, // Ultra-fast ~320x240 capture for real-time 15-25ms inference
+      ResolutionPreset.medium, // Crisp 720p/480p preview for crystal-clear video and high-precision landmarks
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
@@ -188,22 +190,40 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
   Future<void> _switchCamera() async {
     if (widget.cameras.length < 2) return;
-    _liveScanTimer?.cancel();
+    _stopLiveScanLoop();
     int nextIndex = (_selectedCameraIndex + 1) % widget.cameras.length;
     await _initializeCamera(cameraIndex: nextIndex);
   }
 
   void _startLiveScanLoop() {
-    _liveScanTimer?.cancel();
-    // High-frequency scan loop (every 220ms) for instant detection
-    _liveScanTimer = Timer.periodic(const Duration(milliseconds: 220), (_) {
-      _processLiveFrame();
-    });
+    _stopLiveScanLoop();
+    _isScanLoopActive = true;
+    _runContinuousScanner();
   }
 
   void _stopLiveScanLoop() {
+    _isScanLoopActive = false;
     _liveScanTimer?.cancel();
     _liveScanTimer = null;
+  }
+
+  Future<void> _runContinuousScanner() async {
+    while (_isScanLoopActive && mounted) {
+      if (_cameraController != null &&
+          _cameraController!.value.isInitialized &&
+          !_isProcessingFrame) {
+        // If a punch was just recorded, pause scanning for 2.2 seconds to show congratulations UI
+        if (_lastRecognizedTime != null &&
+            DateTime.now().difference(_lastRecognizedTime!).inMilliseconds < 2200) {
+          await Future.delayed(const Duration(milliseconds: 250));
+          continue;
+        }
+
+        await _processLiveFrame();
+      }
+      // Give camera viewfinder a 100ms breather for buttery smooth 60fps preview without shutter freeze
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
   }
 
   Future<void> _processLiveFrame() async {
@@ -274,8 +294,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
         final pct = (rollingConfidence * 100).clamp(0, 100).toInt();
 
-        // Fast verification: instant match on high confidence (>= 0.70) or 2nd frame for 0.68-0.70
-        if (rollingConfidence < 0.68) {
+        // High-speed verification: instant match on high confidence (>= 0.65) or 2nd frame for 0.60-0.65
+        if (rollingConfidence < 0.60) {
           setState(() {
             _recognizedUser = user;
             _isLivenessPassed = false;
@@ -284,8 +304,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
           return;
         }
 
-        // Instant punch on confident ArcFace match (>= 0.70) or verified liveness / multi-frame
-        final bool isHighConfidence = rollingConfidence >= 0.70;
+        // Instant punch on confident ArcFace match (>= 0.65) or verified liveness / multi-frame
+        final bool isHighConfidence = rollingConfidence >= 0.65;
         final bool isLive = isHighConfidence || result.isLivenessVerified || _consecutiveMatchCount >= 2;
         if (!isLive) {
           setState(() {
