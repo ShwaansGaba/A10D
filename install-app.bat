@@ -42,16 +42,27 @@ for /f "skip=1 tokens=1,2" %%A in ('%ADB% devices') do (
 if not defined DEVICE_FOUND (
     echo [WARNING] No authorized Android device detected.
     echo.
-    echo Please make sure:
-    echo  1. Your phone is connected via USB cable.
-    echo  2. "USB Debugging" is enabled in Developer Options.
-    echo  3. Tap "Allow USB Debugging" on your phone's screen.
+    echo You can install via USB Cable OR Wireless Wi-Fi:
+    echo   - If using USB: Plug in your cable, enable USB Debugging, and press Enter.
+    echo   - If Wireless: Enable "Wireless Debugging" on phone and enter the IP:Port below.
     echo.
-    echo Retrying in 5 seconds...
-    ping 127.0.0.1 -n 6 >nul
-    for /f "skip=1 tokens=1,2" %%A in ('%ADB% devices') do (
-        if "%%B"=="device" (
-            set DEVICE_FOUND=1
+    set /p USER_INPUT="Enter Wireless IP:PORT (e.g. 192.168.1.50:5555) or press Enter for USB: "
+    if defined USER_INPUT (
+        echo Connecting to !USER_INPUT! via Wireless ADB...
+        %ADB% connect !USER_INPUT!
+        ping 127.0.0.1 -n 3 >nul
+        for /f "skip=1 tokens=1,2" %%A in ('%ADB% devices') do (
+            if "%%B"=="device" (
+                set DEVICE_FOUND=1
+            )
+        )
+    ) else (
+        echo Retrying USB connection in 3 seconds...
+        ping 127.0.0.1 -n 4 >nul
+        for /f "skip=1 tokens=1,2" %%A in ('%ADB% devices') do (
+            if "%%B"=="device" (
+                set DEVICE_FOUND=1
+            )
         )
     )
 )
@@ -64,7 +75,10 @@ for /f "tokens=*" %%i in ('%ADB% shell getprop ro.product.cpu.abi 2^>nul') do (
 
 echo Detected device ABI: %TARGET_ABI%
 
-set APK_PATH=build\app\outputs\flutter-apk\app-%TARGET_ABI%-release.apk
+set APK_PATH=A10D-Kiosk.apk
+if not exist "%APK_PATH%" (
+    set APK_PATH=build\app\outputs\flutter-apk\app-%TARGET_ABI%-release.apk
+)
 if not exist "%APK_PATH%" (
     if exist "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" (
         set APK_PATH=build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
