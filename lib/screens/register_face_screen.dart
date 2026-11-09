@@ -48,6 +48,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen>
   @override
   void initState() {
     super.initState();
+    FaceRecognitionService().initializeModel();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),

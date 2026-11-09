@@ -7,6 +7,7 @@ import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 import '../models/registered_user.dart';
 import 'supabase_sync_service.dart';
 
@@ -56,10 +57,77 @@ class FaceRecognitionService {
   factory FaceRecognitionService() => _instance;
   FaceRecognitionService._internal();
 
-  static const String _usersKey = 'registered_attendance_faces_v9';
-  // Biometric thresholds: calibrated for Affine-Aligned Contour Geometry
-  static const double matchThreshold = 0.72;
+  static const String _usersKey = 'registered_attendance_faces_mfn_v1';
+  // Industry Standard: MobileFaceNet ArcFace Deep CNN Biometric Thresholds
+  static const double matchThreshold = 0.68;
   static const double ambiguityMargin = 0.08;
+
+  Interpreter? _interpreter;
+  bool _isModelLoading = false;
+
+  /// Loads and warms up the MobileFaceNet ArcFace Deep Neural Network (~5.2 MB)
+  Future<void> initializeModel() async {
+    if (_interpreter != null) return;
+    if (_isModelLoading) return;
+    _isModelLoading = true;
+    try {
+      final options = InterpreterOptions()..threads = 4;
+      _interpreter = await Interpreter.fromAsset(
+        'assets/models/mobilefacenet.tflite',
+        options: options,
+      );
+      _interpreter!.allocateTensors();
+      debugPrint('MobileFaceNet ArcFace CNN initialized: '
+          'input=${_interpreter!.getInputTensor(0).shape}, output=${_interpreter!.getOutputTensor(0).shape}');
+    } catch (e) {
+      debugPrint('Notice loading MobileFaceNet model via asset: $e');
+    } finally {
+      _isModelLoading = false;
+    }
+  }
+
+  /// Runs inference on a 112x112 aligned face chip through MobileFaceNet
+  List<double>? _runMobileFaceNet(img.Image faceChip) {
+    if (_interpreter == null) return null;
+
+    try {
+      // 1. Ensure chip is exact 112x112 model input size
+      final img.Image resized = (faceChip.width == 112 && faceChip.height == 112)
+          ? faceChip
+          : img.copyResize(faceChip, width: 112, height: 112, interpolation: img.Interpolation.linear);
+
+      // 2. Normalize RGB pixels to float32 tensor [1, 112, 112, 3]
+      // MobileFaceNet standard: (pixel - 127.5) / 128.0 (maps [0, 255] to ~[-1.0, 1.0])
+      final input = List.generate(
+        1,
+        (_) => List.generate(
+          112,
+          (y) => List.generate(
+            112,
+            (x) {
+              final pixel = resized.getPixel(x, y);
+              return [
+                (pixel.r - 127.5) / 128.0,
+                (pixel.g - 127.5) / 128.0,
+                (pixel.b - 127.5) / 128.0,
+              ];
+            },
+          ),
+        ),
+      );
+
+      // 3. Output buffer for 192-D deep feature vector [1, 192]
+      final output = List.generate(1, (_) => List<double>.filled(192, 0.0));
+
+      _interpreter!.run(input, output);
+
+      final rawVec = output[0];
+      return _l2Normalize(rawVec);
+    } catch (e) {
+      debugPrint('MobileFaceNet inference error: $e');
+      return null;
+    }
+  }
 
   // Sliding window buffer for liveness & anti-spoofing detection
   final List<LivenessSample> _livenessHistory = [];
@@ -78,6 +146,7 @@ class FaceRecognitionService {
 
   /// Load all registered users from local phone storage
   Future<List<RegisteredUser>> getRegisteredUsers() async {
+    await initializeModel();
     final prefs = await SharedPreferences.getInstance();
     final jsonList = prefs.getStringList(_usersKey) ?? [];
     return jsonList.map((jsonStr) => RegisteredUser.fromJson(jsonStr)).toList();
@@ -287,10 +356,10 @@ class FaceRecognitionService {
           final extraction = await extractFaceEmbedding(localPhotoPath);
           if (extraction != null && extraction.embedding.isNotEmpty) {
             parsedEmbeddings = [extraction.embedding];
-            debugPrint('Biometric 192-D ML Kit vector computed from photo for employee: $name');
+            debugPrint('Biometric 192-D MobileFaceNet vector computed from photo for employee: $name');
           }
         } catch (e) {
-          debugPrint('ML Kit photo feature extraction notice for $name: $e');
+          debugPrint('MobileFaceNet photo feature extraction notice for $name: $e');
         }
       }
 
@@ -374,7 +443,7 @@ class FaceRecognitionService {
 
       if (cropW > 10 && cropH > 10) {
         final cropped = img.copyCrop(workingImage, x: cropX, y: cropY, width: cropW, height: cropH);
-        return img.copyResize(cropped, width: 96, height: 96);
+        return img.copyResize(cropped, width: 112, height: 112);
       }
     } catch (e) {
       debugPrint('Affine face alignment notice: $e');
@@ -382,9 +451,11 @@ class FaceRecognitionService {
     return null;
   }
 
-  /// High-speed biometric embedding extraction with affine alignment, geometry mesh and visual grid
+  /// High-speed biometric embedding extraction via MobileFaceNet ArcFace Deep CNN
   Future<({Face face, List<double> embedding, String? croppedPath})?>
       extractFaceEmbedding(String imagePath, {bool generateCrop = false}) async {
+    await initializeModel();
+
     final inputImage = InputImage.fromFilePath(imagePath);
     final faces = await _detector.processImage(inputImage);
 
@@ -402,11 +473,12 @@ class FaceRecognitionService {
     final primaryFace = faces.first;
     String? croppedPath;
     img.Image? alignedFace;
+    img.Image? decoded;
 
     try {
       final file = File(imagePath);
       final bytes = await file.readAsBytes();
-      final decoded = img.decodeImage(bytes);
+      decoded = img.decodeImage(bytes);
 
       if (decoded != null) {
         alignedFace = _alignAndCropFace(decoded, primaryFace);
@@ -424,8 +496,31 @@ class FaceRecognitionService {
       debugPrint('Crop & alignment generation notice: $e');
     }
 
-    final biometricFeatures = _buildBiometricVector(primaryFace, alignedFace);
-    final normalizedEmbedding = _l2Normalize(biometricFeatures);
+    // 1. Primary: Run MobileFaceNet ArcFace Deep CNN
+    List<double>? deepEmbedding;
+    if (alignedFace != null) {
+      deepEmbedding = _runMobileFaceNet(alignedFace);
+    }
+
+    // Fallback crop if affine alignment was null
+    if (deepEmbedding == null && decoded != null) {
+      try {
+        final box = primaryFace.boundingBox;
+        final marginX = (box.width * 0.15).toInt();
+        final marginY = (box.height * 0.15).toInt();
+        final cropX = math.max(0, box.left.toInt() - marginX);
+        final cropY = math.max(0, box.top.toInt() - marginY);
+        final cropW = math.min(decoded.width - cropX, box.width.toInt() + 2 * marginX);
+        final cropH = math.min(decoded.height - cropY, box.height.toInt() + 2 * marginY);
+        if (cropW > 10 && cropH > 10) {
+          final directCrop = img.copyCrop(decoded, x: cropX, y: cropY, width: cropW, height: cropH);
+          deepEmbedding = _runMobileFaceNet(directCrop);
+        }
+      } catch (_) {}
+    }
+
+    // 2. Safety Fallback: Landmark geometry vector if model inference fails
+    final normalizedEmbedding = deepEmbedding ?? _l2Normalize(_buildBiometricVector(primaryFace, alignedFace));
 
     return (
       face: primaryFace,
@@ -494,22 +589,8 @@ class FaceRecognitionService {
     double highestScore = -1.0;
     double secondHighestScore = -1.0;
 
-    // Enterprise Scalability: Coarse-to-Fine Indexing
-    // If database has > 50 employees, pre-filter by 16-D primary geometric index
-    List<RegisteredUser> candidates = registeredUsers;
-    if (registeredUsers.length > 50) {
-      final coarseProbe = extraction.embedding.take(16).toList();
-      final ranked = <({RegisteredUser user, double coarseSim})>[];
-
-      for (final u in registeredUsers) {
-        if (u.embeddings.isEmpty) continue;
-        final uCoarse = u.embeddings.first.take(16).toList();
-        final cSim = _calculateCosineSimilarity(coarseProbe, uCoarse);
-        ranked.add((user: u, coarseSim: cSim));
-      }
-      ranked.sort((a, b) => b.coarseSim.compareTo(a.coarseSim));
-      candidates = ranked.take(50).map((r) => r.user).toList();
-    }
+    // Direct high-accuracy comparison against all enrolled employee embeddings
+    final List<RegisteredUser> candidates = registeredUsers;
 
     for (final candidate in candidates) {
       double candidateMax = -1.0;

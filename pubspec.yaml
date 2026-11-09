@@ -48,6 +48,7 @@ dependencies:
   flutter_tts: ^4.2.5
   connectivity_plus: ^7.3.1
   url_launcher: ^6.3.1
+  tflite_flutter: ^0.12.1
 
 dev_dependencies:
   flutter_test:
@@ -73,6 +74,7 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - assets/models/mobilefacenet.tflite
 
   # To add assets to your application, add an assets section, like this:
   # assets:

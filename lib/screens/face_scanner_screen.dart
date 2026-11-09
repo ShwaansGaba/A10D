@@ -58,6 +58,9 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
     // Initialize audio & TTS engine
     AudioFeedbackService().initialize();
 
+    // Warm up MobileFaceNet TFLite neural network
+    FaceRecognitionService().initializeModel();
+
     _scannerAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -271,8 +274,8 @@ class _FaceScannerScreenState extends State<FaceScannerScreen>
 
         final pct = (rollingConfidence * 100).clamp(0, 100).toInt();
 
-        // Fast & smooth verification: require 1-2 frames with rolling confidence >= 0.72
-        if (_consecutiveMatchCount < 1 || rollingConfidence < 0.72) {
+        // Fast & smooth verification: require 1-2 frames with rolling confidence >= 0.68
+        if (_consecutiveMatchCount < 1 || rollingConfidence < 0.68) {
           setState(() {
             _recognizedUser = user;
             _isLivenessPassed = false;
